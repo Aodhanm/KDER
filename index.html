@@ -338,7 +338,7 @@ const LIFT = [[0,1]];   // a short breath between passes
 const ODE_MELODY = [].concat(
   ODE_LOW, LIFT, odeHigh(2), LIFT, ODE_LOW, LIFT, odeHigh(3), [[0,1.5]]
 );
-const MOON_BEAT = 0.42, MOON_VOL = 0.16;
+const MOON_BEAT = 0.54, MOON_VOL = 0.13;   // slower, stately Moog tempo; saw voice is richer so a touch quieter
 let moonGain = null, moonTimer = null, moonPlaying = false;
 
 // ===== San Francisco landing, option B: synthesized "The Star-Spangled Banner" (public domain) =====
@@ -373,6 +373,50 @@ function scheduleSynthTune(melody, bus, beat, leadVol, bassVol) {
   }
   return t - start;
 }
+// Moog voice (à la Wendy Carlos' "A Clockwork Orange" electronic Beethoven): two detuned
+// sawtooth oscillators + a sine sub an octave down, run through a resonant lowpass with a
+// per-note "wah" filter envelope, a shared vibrato LFO, and portamento (pitch glide) between
+// notes. Schedules one pass of a [freqHz, beats] melody onto `bus`. Returns its length (s).
+function scheduleMoogTune(melody, bus, beat) {
+  const start = audio.currentTime + 0.08;
+  const lfo = audio.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 5.6;
+  const lfoGain = audio.createGain(); lfoGain.gain.value = 6;   // ±6 cents vibrato
+  lfo.connect(lfoGain);
+  let t = start, prevF = 0, last = start;
+  for (const [f, beats] of melody) {
+    const dur = beats * beat, end = t + dur;
+    if (f > 0) {
+      const glide = prevF ? 0.05 : 0;
+      const filt = audio.createBiquadFilter();
+      filt.type = "lowpass"; filt.Q.value = 6;
+      filt.frequency.setValueAtTime(Math.min(9000, f * 8 + 3800), t);
+      filt.frequency.exponentialRampToValueAtTime(Math.max(320, f * 2.2), t + Math.min(0.24, dur * 0.85));
+      const amp = audio.createGain(); const peak = 0.5, sus = 0.36;
+      amp.gain.setValueAtTime(0.0001, t);
+      amp.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+      amp.gain.exponentialRampToValueAtTime(sus, t + 0.085);
+      amp.gain.setValueAtTime(sus, Math.max(t + 0.086, end - dur * 0.12));
+      amp.gain.exponentialRampToValueAtTime(0.0001, end - dur * 0.03);
+      filt.connect(amp); amp.connect(bus);
+      for (const det of [-6, 7]) {
+        const o = audio.createOscillator(); o.type = "sawtooth"; o.detune.value = det;
+        lfoGain.connect(o.detune);
+        if (glide) { o.frequency.setValueAtTime(prevF, t); o.frequency.linearRampToValueAtTime(f, t + glide); }
+        else o.frequency.setValueAtTime(f, t);
+        o.connect(filt); o.start(t); o.stop(end);
+      }
+      const sub = audio.createOscillator(); sub.type = "sine";
+      if (glide) { sub.frequency.setValueAtTime(prevF / 2, t); sub.frequency.linearRampToValueAtTime(f / 2, t + glide); }
+      else sub.frequency.setValueAtTime(f / 2, t);
+      const subG = audio.createGain(); subG.gain.value = 0.5;
+      sub.connect(subG); subG.connect(amp); sub.start(t); sub.stop(end);
+      prevF = f;
+    }
+    t = end; last = end;
+  }
+  lfo.start(start); lfo.stop(last);
+  return t - start;
+}
 function startMoonSynth() {
   if (moonPlaying) return;
   if (!audioReady) initAudio();
@@ -384,7 +428,7 @@ function startMoonSynth() {
   moonPlaying = true;
   const loop = () => {
     if (!moonPlaying) return;
-    const len = scheduleSynthTune(ODE_MELODY, moonGain, MOON_BEAT, 0.5, 0.3);
+    const len = scheduleMoogTune(ODE_MELODY, moonGain, MOON_BEAT);
     moonTimer = setTimeout(loop, len * 1000);
   };
   loop();
