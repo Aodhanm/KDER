@@ -635,10 +635,13 @@ function buildTerrain() {
     let dir = Math.random() < 0.5 ? 1 : -1;
     while (x < until) {
       if (x - lastPadX > nextPadGap && x < until - 150) { placePad(padMults[padIdx++ % padMults.length]); lastPadX = x; nextPadGap = rand(560, 920); dir = Math.random() < 0.5 ? 1 : -1; continue; }
-      const step = rand(22, 74), dy = dir * rand(45, 215);   // straight angular segment, big swing
+      const step = rand(60, 150), dy = dir * rand(40, 165);   // long, gentler segments -> rounded mountains, not spikes
       x += step; y = clamp(y + dy, LO, HI);
       terrain.push({ x, y });
-      if (Math.random() < 0.74 || y < LO + 40 || y > HI - 40) dir = -dir;   // mostly reverse -> alternating peaks & valleys
+      if (Math.random() < 0.5 || y < LO + 45 || y > HI - 45) {
+        x += rand(20, 60); terrain.push({ x, y });   // a short flat crest/trough so peaks aren't pointy
+        dir = -dir;
+      }
     }
   }
 
