@@ -301,14 +301,15 @@ function stopTitleMusic() {
   try { titleAudio.pause(); } catch (e) {}
 }
 // ===== Gameplay music, option B: synthesized "Ode to Joy" (Beethoven, 9th Symphony, 1824) =====
-// Same square-lead + triangle-bass voice as the title theme. The main theme in C major,
-// all 16 bars (A A' B A'), looped. Melody is public domain.
-// [frequencyHz, durationInBeats]; freq 0 = a rest. C4 261.63 D4 293.66 E4 329.63 F4 349.23 G4 392 G3 196.
-const ODE_MELODY = [
+// Same square-lead + triangle-bass voice as the title theme. FOUR passes that build:
+// low statement -> octave HIGH -> back to low -> octave HIGH again with a held grand finish,
+// then it loops (~110s). Melody is public domain. [frequencyHz, durationInBeats]; freq 0 = a rest.
+// low: C4 261.63 D4 293.66 E4 329.63 F4 349.23 G4 392 G3 196 | high octave = x2.
+const ODE_LOW = [
   // A: E E F G | G F E D | C C D E | E. D D
   [329.63,1],[329.63,1],[349.23,1],[392,1], [392,1],[349.23,1],[329.63,1],[293.66,1],
   [261.63,1],[261.63,1],[293.66,1],[329.63,1], [329.63,1.5],[293.66,0.5],[293.66,2],
-  // A': E E F G | G F E D | C C D E | D. C C
+  // A': ... D. C C
   [329.63,1],[329.63,1],[349.23,1],[392,1], [392,1],[349.23,1],[329.63,1],[293.66,1],
   [261.63,1],[261.63,1],[293.66,1],[329.63,1], [293.66,1.5],[261.63,0.5],[261.63,2],
   // B: D D E C | D E F E C | D E F E D | C D G(low)
@@ -316,11 +317,27 @@ const ODE_MELODY = [
   [293.66,1],[329.63,0.5],[349.23,0.5],[329.63,1],[261.63,1],
   [293.66,1],[329.63,0.5],[349.23,0.5],[329.63,1],[293.66,1],
   [261.63,1],[293.66,1],[196,2],
-  // A': E E F G | G F E D | C C D E | D. C C
+  // A':
   [329.63,1],[329.63,1],[349.23,1],[392,1], [392,1],[349.23,1],[329.63,1],[293.66,1],
-  [261.63,1],[261.63,1],[293.66,1],[329.63,1], [293.66,1.5],[261.63,0.5],[261.63,2],
-  [0,1.5]   // breath before the loop repeats
+  [261.63,1],[261.63,1],[293.66,1],[329.63,1], [293.66,1.5],[261.63,0.5],[261.63,2]
 ];
+// the same theme an octave up; pass a final-note hold (2 = normal, 3 = grand finish)
+function odeHigh(hold) { return [
+  [659.25,1],[659.25,1],[698.46,1],[783.99,1], [783.99,1],[698.46,1],[659.25,1],[587.33,1],
+  [523.25,1],[523.25,1],[587.33,1],[659.25,1], [659.25,1.5],[587.33,0.5],[587.33,2],
+  [659.25,1],[659.25,1],[698.46,1],[783.99,1], [783.99,1],[698.46,1],[659.25,1],[587.33,1],
+  [523.25,1],[523.25,1],[587.33,1],[659.25,1], [587.33,1.5],[523.25,0.5],[523.25,2],
+  [587.33,1],[587.33,1],[659.25,1],[523.25,1],
+  [587.33,1],[659.25,0.5],[698.46,0.5],[659.25,1],[523.25,1],
+  [587.33,1],[659.25,0.5],[698.46,0.5],[659.25,1],[587.33,1],
+  [523.25,1],[587.33,1],[392,2],
+  [659.25,1],[659.25,1],[698.46,1],[783.99,1], [783.99,1],[698.46,1],[659.25,1],[587.33,1],
+  [523.25,1],[523.25,1],[587.33,1],[659.25,1], [587.33,1.5],[523.25,0.5],[523.25,hold]
+]; }
+const LIFT = [[0,1]];   // a short breath between passes
+const ODE_MELODY = [].concat(
+  ODE_LOW, LIFT, odeHigh(2), LIFT, ODE_LOW, LIFT, odeHigh(3), [[0,1.5]]
+);
 const MOON_BEAT = 0.42, MOON_VOL = 0.16;
 let moonGain = null, moonTimer = null, moonPlaying = false;
 
