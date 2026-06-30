@@ -198,6 +198,8 @@ const usAnthem = new Audio("us_anthem.mp3"); usAnthem.volume = 0.85; usAnthem.pr
 // looping rocket-engine rumble (Earth-launch rocket only)
 const rocketEngine = new Audio("rocket_engine.mp3"); rocketEngine.loop = true; rocketEngine.volume = 0; rocketEngine.preload = "auto";
 const countdown = new Audio("countdown.m4a"); countdown.preload = "auto"; countdown.volume = 0.9;   // launch countdown (1:55-2:00 of the compilation) played during the horizontal->vertical raise
+const ww3Audio = new Audio("ww3_boom.m4a"); ww3Audio.preload = "auto"; ww3Audio.volume = 1;   // nuclear blast for WW3 (clip already begins at the 10s mark); everything else goes silent
+ww3Audio.addEventListener("ended", () => { if (masterGain && audio) masterGain.gain.setTargetAtTime(0.6, audio.currentTime, 0.4); });
 // cash-register "cha-ching" for the SF payout
 const cashAudio = new Audio("cash_register.mp3"); cashAudio.volume = 0.9; cashAudio.preload = "auto";
 // honor-cannon report (pool)
@@ -921,6 +923,7 @@ function newGame(withTransmission = true) {
   throttle = 0; fuel = START_FUEL; soyuzFuel = SOYUZ_MOON_FUEL; score = 0; timeLeft = 120;
   state = "play"; msg = ""; particles = [];
   celebrating = false; ww3Start = 0; ww3Clouds = []; ww3Missiles = []; ww3SputBoom = null;
+  restoreMasterAudio();   // in case a new game starts straight out of WW3
   showFlag = false; landedPad = null;
   gear = null; gameSputnik = null; gameFireballs = [];
   takeoff = null; crashedInAscent = false; asteroid = null; nextAsteroid = 0;
@@ -1011,8 +1014,19 @@ function startCelebration() {
 }
 
 // landing at the American base sets off World War III back on Earth
+// restore normal audio after WW3 (stop the blast, bring the master bus back up)
+function restoreMasterAudio() {
+  try { ww3Audio.pause(); ww3Audio.currentTime = 0; } catch (e) {}
+  if (masterGain && audio) masterGain.gain.setTargetAtTime(0.6, audio.currentTime, 0.1);
+}
 function startWW3() {
   ww3Start = performance.now();
+  // WW3: cut ALL music and other sounds — only the nuclear blast plays
+  try { bgm.pause(); anthem.pause(); usAnthem.pause(); alarm.pause(); rocketEngine.pause(); countdown.pause(); gagarin.pause(); radio.pause(); sputnikIntro.pause(); } catch (e) {}
+  stopMoonSynth(); stopSsbSynth(); stopAllMigEngines();
+  if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
+  if (masterGain && audio) masterGain.gain.setTargetAtTime(0, audio.currentTime, 0.04);   // mute every synth/Web-Audio sound
+  try { ww3Audio.currentTime = 0; ww3Audio.play().catch(() => {}); } catch (e) {}
   // place the war within the USSR's borders on the globe (sample the land outline, pulled inward)
   const pts = (typeof EARTH_LAND !== "undefined" ? EARTH_LAND : []).flat();
   let cxu = 0, cyu = 0; for (const p of pts) { cxu += p[0]; cyu += p[1]; } if (pts.length) { cxu /= pts.length; cyu /= pts.length; }
@@ -1116,6 +1130,7 @@ window.addEventListener("keydown", (e) => {
     onTitle = true; intro = false; launching = false;
     alarm.pause(); stopBgm(); stopSsbSynth(); anthem.pause(); usAnthem.pause(); stopIntroSounds();
     if (anthemActive) { anthemActive = false; if (masterGain) masterGain.gain.value = 0.6; }
+    restoreMasterAudio();   // also un-mutes if we Escaped out of WW3
     startTitleMusic();
     return;
   }
