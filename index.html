@@ -197,6 +197,7 @@ function migJetSound() { const a = jetPool[jetIdx]; jetIdx = (jetIdx + 1) % jetP
 const usAnthem = new Audio("us_anthem.mp3"); usAnthem.volume = 0.85; usAnthem.preload = "auto"; usAnthem.load();
 // looping rocket-engine rumble (Earth-launch rocket only)
 const rocketEngine = new Audio("rocket_engine.mp3"); rocketEngine.loop = true; rocketEngine.volume = 0; rocketEngine.preload = "auto";
+const countdown = new Audio("countdown.mp3"); countdown.preload = "auto"; countdown.volume = 0.9;   // launch countdown played during the horizontal->vertical raise
 // cash-register "cha-ching" for the SF payout
 const cashAudio = new Audio("cash_register.mp3"); cashAudio.volume = 0.9; cashAudio.preload = "auto";
 // honor-cannon report (pool)
@@ -726,6 +727,7 @@ let lzoom = 1;           // launch/re-entry camera zoom (homecoming zooms in on 
 let launchStars = null, launchSurface = null, launchParts = [], launchFireballs = [], flungPeople = [];
 let launchDiscards = [], launchFlash = 0;   // jettisoned stages tumbling away + the staging white flash
 const LAUNCH_FUEL = 1200, L_FUEL_BURN = 19;   // rocket tank; Soyuz/lander get their own tanks at separation
+const RAISE_DUR_DEFAULT = 9000;   // fallback rollout-raise duration if the countdown audio length isn't known yet
 const SOYUZ_FUEL = 500, LANDER_FUEL = 250;
 // Moon -> Earth climb (fly the docked Soyuz up to orbit after re-docking)
 const MC_ORBIT_ALT = 1150, MC_ORBIT_SPEED = 78, MC_SPACE_ALT = 650, MC_FUEL = 500;
@@ -1057,7 +1059,8 @@ window.addEventListener("keydown", (e) => {
     if (e.key.toLowerCase() === "a" && rocket.phase === "fly") launchCrash("SELF-DESTRUCT");
     if (e.key.toLowerCase() === "x" && !e.repeat && rocket.phase === "fly") stageLaunch();
     if (e.key === "Enter") {
-      if (rocket.phase === "crashed") { if (homecoming) startHomecoming(homecoming); else startLaunch(); }
+      if (rocket.phase === "raise") { rocket.phase = "fly"; rocket.angle = 0; try { countdown.pause(); } catch (e2) {} }
+      else if (rocket.phase === "crashed") { if (homecoming) startHomecoming(homecoming); else startLaunch(); }
       else if (rocket.phase === "landed" && homecoming) { anthem.pause(); usAnthem.pause(); stopSsbSynth(); stopAllMigEngines(); launching = false; homecoming = null; onTitle = true; startTitleMusic(); }   // homecoming win -> title
       else if (rocket.phase === "landed") { anthem.pause(); usAnthem.pause(); stopSsbSynth(); stopAllMigEngines(); startBgm(); startLaunch(); }
       else { launching = false; intro = true; introStart = performance.now(); introStaged = false; introNosed = false; introFlashed = false; introRocketSnd = introRocketDone = introLanderSnd = introLanderDone = false; try { rocketEngine.pause(); rocketEngine.volume = 0; } catch (e) {} if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.02); }
@@ -2014,11 +2017,18 @@ function drawLKBody(noLegs) {
     }
   }
   glowOff();
-  // small round porthole window on the cabin (light blue)
-  glowOn(6, "#bfe9ff"); ctx.strokeStyle = "#bfe9ff"; ctx.lineWidth = 1.4;
-  ctx.beginPath(); ctx.arc(2.6, -8, 1.9, 0, Math.PI * 2); ctx.stroke();
-  glowOff();
-  drawStar(-2.5, -4.5, 2.8, 1.2, "#e22");
+  // red star centered on the middle drum (kept clear of the body outlines)
+  drawStar(0, 2.2, 2.2, 0.95, "#e22");
+  // a clear round porthole centered on the cabin: metal rim + light-blue glass + a highlight
+  ctx.save();
+  glowOn(5); ctx.strokeStyle = FG; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, -6.5, 3, 0, Math.PI * 2); ctx.stroke();
+  glowOn(6, "#bfe9ff"); ctx.fillStyle = "#bfe9ff"; ctx.beginPath(); ctx.arc(0, -6.5, 2.2, 0, Math.PI * 2); ctx.fill();
+  glowOff(); ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(-0.9, -7.4, 0.7, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // tiny, slow-blinking red beacon at the antenna tip (very small)
+  { const on = Math.floor(performance.now() / 900) % 2 === 0;
+    if (on) { glowOn(5, "#ff2a2a"); ctx.fillStyle = "#ff4b4b"; } else { glowOff(); ctx.fillStyle = "#3a1010"; }
+    ctx.beginPath(); ctx.arc(0, -17.4, 0.9, 0, Math.PI * 2); ctx.fill(); glowOff(); }
   // engine flame
   if (throttle > 0.05 && fuel > 0 && (state === "play" || state === "ascent")) {
     const len = 5 + throttle * 20 + Math.random() * 6;
@@ -2115,10 +2125,16 @@ function drawSoyuzAt(x, y) {
   }
   // service module
   ctx.beginPath(); ctx.rect(-8, -5, 16, 13); ctx.stroke();
-  // solar panels (wings)
-  ctx.beginPath(); ctx.rect(-40, -3, 30, 8); ctx.rect(10, -3, 30, 8); ctx.stroke();
-  for (let i = -34; i <= -16; i += 6) { ctx.beginPath(); ctx.moveTo(i, -3); ctx.lineTo(i, 5); ctx.stroke(); }
-  for (let i = 16; i <= 34; i += 6) { ctx.beginPath(); ctx.moveTo(i, -3); ctx.lineTo(i, 5); ctx.stroke(); }
+  if (n1()) {
+    // fuel-cell LOK: no big solar wings — short ribbed radiator fins flanking the service module
+    ctx.beginPath(); ctx.rect(-13, -1, 5, 8); ctx.rect(8, -1, 5, 8); ctx.stroke();
+    for (let j = 1; j <= 5; j += 1.6) { ctx.beginPath(); ctx.moveTo(-13, -1 + j); ctx.lineTo(-8, -1 + j); ctx.moveTo(8, -1 + j); ctx.lineTo(13, -1 + j); ctx.stroke(); }
+  } else {
+    // solar panels (wings)
+    ctx.beginPath(); ctx.rect(-40, -3, 30, 8); ctx.rect(10, -3, 30, 8); ctx.stroke();
+    for (let i = -34; i <= -16; i += 6) { ctx.beginPath(); ctx.moveTo(i, -3); ctx.lineTo(i, 5); ctx.stroke(); }
+    for (let i = 16; i <= 34; i += 6) { ctx.beginPath(); ctx.moveTo(i, -3); ctx.lineTo(i, 5); ctx.stroke(); }
+  }
   // descent capsule (bell)
   ctx.beginPath(); ctx.moveTo(-8, 8); ctx.lineTo(8, 8); ctx.lineTo(5, 16); ctx.lineTo(-5, 16); ctx.closePath(); ctx.stroke();
   // docking port / probe at the BOTTOM (where the lander attaches)
@@ -2129,10 +2145,11 @@ function drawSoyuzAt(x, y) {
   // navigation lights — red port wing / green starboard, alternating slow flash
   {
     const redOn = Math.floor(performance.now() / 600) % 2 === 0;
+    const navX = n1() ? 13 : 40;   // LOK has no wings, so the nav lights sit on the radiator fins
     if (redOn) { glowOn(6, "#ff2a2a"); ctx.fillStyle = "#ff3b3b"; } else { glowOff(); ctx.fillStyle = "#3a1010"; }
-    ctx.beginPath(); ctx.arc(-40, 1, 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-navX, 1, 1.4, 0, Math.PI * 2); ctx.fill();
     if (!redOn) { glowOn(6, "#2aff5a"); ctx.fillStyle = "#3bff6b"; } else { glowOff(); ctx.fillStyle = "#10341a"; }
-    ctx.beginPath(); ctx.arc(40, 1, 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(navX, 1, 1.4, 0, Math.PI * 2); ctx.fill();
     glowOff();
   }
   ctx.restore();
@@ -2146,6 +2163,7 @@ function soyuzCollision() {
     const cx = clamp(dx, x1, x2), cy = clamp(ly, y1, y2);
     return (dx - cx) * (dx - cx) + (ly - cy) * (ly - cy) < r * r;
   };
+  if (n1()) return hit(-9 * S, -22 * S, 9 * S, 16 * S);   // fuel-cell LOK: body only, no wings
   return hit(-9 * S, -22 * S, 9 * S, 16 * S) ||   // central body
          hit(-40 * S, -3 * S, -10 * S, 5 * S) ||   // left panel
          hit(10 * S, -3 * S, 40 * S, 5 * S);       // right panel
@@ -2834,10 +2852,13 @@ function buildLaunchSurface() {
 }
 function startLaunch() {
   launching = true; homecoming = null; lzoom = 1;
-  rocket = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, fuel: LAUNCH_FUEL, throttle: 0, phase: "fly", stage: "rocket", lifted: false, orbitTime: 0, msg: "", lastBeepIdx: -1 };
+  const raiseDur = (isFinite(countdown.duration) && countdown.duration > 1) ? countdown.duration * 1000 : RAISE_DUR_DEFAULT;
+  // the rocket starts lying horizontal on the erector and is raised to vertical during the countdown
+  rocket = { x: 0, y: 0, vx: 0, vy: 0, angle: Math.PI / 2, fuel: LAUNCH_FUEL, throttle: 0, phase: "raise", stage: "rocket", lifted: false, orbitTime: 0, msg: "", lastBeepIdx: -1, raiseStart: performance.now(), raiseDur };
   launchStars = null; launchParts = []; launchFireballs = []; flungPeople = []; launchDiscards = []; launchFlash = 0;
   try { rocketEngine.pause(); rocketEngine.currentTime = 0; alarm.pause(); } catch (e) {}
   buildLaunchSurface();
+  try { countdown.currentTime = 0; countdown.play().catch(() => {}); } catch (e) {}
 }
 // the chosen homecoming: drop the Soyuz+lander high over the chosen approach and fly it down into the city
 function startHomecoming(side) {
@@ -2975,6 +2996,22 @@ function drawFlungPerson(x, y, rot) {
   ctx.beginPath(); ctx.moveTo(0, 3); ctx.lineTo(-4, 7); ctx.moveTo(0, 3); ctx.lineTo(4, 7); ctx.stroke();      // legs
   ctx.lineCap = "butt"; ctx.restore();
 }
+// a pad explosion that levels the ENTIRE spaceport: every building, shed, tank, tower, dish + the gantry
+function razeSpaceport() {
+  const ls = launchSurface; if (!ls) return;
+  for (const b of ls.buildings) b.destroyed = true;
+  for (const b of ls.bgBuildings) b.destroyed = true;
+  for (const s of ls.sheds) s.destroyed = true;
+  for (const t of ls.tanks) t.destroyed = true;
+  for (const t of ls.towers) t.destroyed = true;
+  for (const d of ls.dishes) d.destroyed = true;
+  ls.gantryDead = true;
+  const now = performance.now();
+  const fc = ["#ff2a10", "#ff6a20", "#ffa83a", "#ffe06a", "#fff3b0", "#9a3526"];
+  for (let i = 0; i < 22; i++) launchFireballs.push({ x: rand(-640, 640), y: rand(-50, 60), t: now + rand(0, 600), big: rand(0.8, 1.7) });
+  for (let i = 0; i < 340; i++) { const a = rand(0, Math.PI * 2), s = rand(40, 460); launchParts.push({ x: rand(-640, 640), y: rand(-50, 30), vx: Math.cos(a) * s, vy: Math.abs(Math.sin(a) * s) + rand(0, 60), life: rand(0.8, 3.0), kind: "boom", col: fc[(Math.random() * fc.length) | 0] }); }
+  for (let i = 0; i < 120; i++) { const a = rand(0, Math.PI * 2), s = rand(40, 320); launchParts.push({ x: rand(-640, 640), y: rand(-50, 30), vx: Math.cos(a) * s, vy: Math.abs(Math.sin(a) * s), rot: rand(0, 6.28), vrot: rand(-12, 12), len: rand(5, 16), life: rand(1, 3), kind: "shard", col: ["#cdd2d8", "#9aa0a8", "#b8bcc4"][(Math.random() * 3) | 0] }); }
+}
 function launchCrash(m) {
   rocket.phase = "crashed"; rocket.msg = m; rocket.boomTime = performance.now();
   const big = n1() && rocket.stage === "rocket" ? 2.3 : 1;   // the fuelled N1 goes up far bigger
@@ -2982,6 +3019,7 @@ function launchCrash(m) {
   destroyBuildings(rocket.x);
   destroyTanks(rocket.x);
   flingPeopleNear(rocket.x);
+  if (rocket.y < 150) razeSpaceport();   // an explosion on/near the pad takes the whole spaceport with it
   try { rocketEngine.pause(); rocketEngine.volume = 0; } catch (e) {}
   rocketExplosionSound();
   screamSound();
@@ -3259,6 +3297,15 @@ function updateLaunch(dt) {
   for (const fp of flungPeople) { fp.x += fp.vx * dt; fp.yoff += fp.vy * dt; fp.vy -= 560 * dt; fp.rot += fp.vrot * dt; fp.life -= dt; if (fp.yoff < 9) { fp.yoff = 9; fp.vy = 0; fp.vx *= 0.7; fp.vrot *= 0.6; } }
   flungPeople = flungPeople.filter(fp => fp.life > 0);
 
+  if (r.phase === "raise") {
+    // rollout: ease the rocket from horizontal (π/2) up to vertical (0) over the countdown
+    if (!r.raiseDur || r.raiseDur === RAISE_DUR_DEFAULT) { if (isFinite(countdown.duration) && countdown.duration > 1) r.raiseDur = countdown.duration * 1000; }
+    const t = clamp((performance.now() - r.raiseStart) / (r.raiseDur || RAISE_DUR_DEFAULT), 0, 1);
+    const e = t * t * (3 - 2 * t);
+    r.angle = (1 - e) * (Math.PI / 2);
+    if (t >= 1) { r.phase = "fly"; r.angle = 0; }
+    return;   // no thrust / gravity / collision until it's standing and you fire the engine
+  }
   if (r.phase === "fly") {
     const rotRate = r.stage === "soyuz" ? L_ROT * 0.5 : L_ROT;   // the Soyuz turns slower than the lander/rocket
     if (keys["arrowleft"]) r.angle -= rotRate * dt;
@@ -3320,7 +3367,7 @@ function updateLaunch(dt) {
       }
     }
     // collision with the red service-gantry legs (the skeleton tower flanking the rocket)
-    if (r.phase === "fly") {
+    if (r.phase === "fly" && !launchSurface.gantryDead) {
       const gantryLegs = n1() ? [-70] : [-52, 52];     // N1: one tall tower on the left
       const gantryTop = n1() ? 360 : 230, gantryHalf = n1() ? 15 : 13;
       for (const lx of gantryLegs) {
@@ -3444,6 +3491,17 @@ function drawLaunch() {
     const flame = r.throttle > 0.05 && r.fuel > 0;
     const csc = homecoming ? 0.7 : 0.5;   // re-entry lander a touch bigger, to people-scale
     ctx.save(); ctx.translate(W / 2, anchorY); ctx.rotate(r.angle); ctx.scale(lzoom, lzoom);
+    if (r.phase === "raise") {
+      // the transporter-erector strongback cradling the rocket as it rises (co-rotates with it)
+      const len = n1() ? 240 : 96, sideX = n1() ? 32 : 22;
+      ctx.save(); glowOff(); ctx.lineCap = "round";
+      ctx.strokeStyle = "#7a7f87"; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(sideX, 26); ctx.lineTo(sideX, -len); ctx.stroke();
+      ctx.lineWidth = 2;
+      for (let yy = 22; yy > -len; yy -= 28) { ctx.beginPath(); ctx.moveTo(sideX, yy); ctx.lineTo(sideX - 13, yy); ctx.stroke(); }
+      ctx.strokeStyle = "#c4302a"; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(sideX - 4, 26, 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     if (r.stage === "lander") {
       ctx.scale(csc, csc); ctx.translate(0, -16);
       if (homecoming && r.phase === "fly") drawParachute();   // re-entry descends under a parachute
@@ -3460,6 +3518,20 @@ function drawLaunch() {
       ctx.scale(1.35, 1.35); ctx.translate(0, -18);
       drawRocket(flame, 0);
     }
+    ctx.restore();
+  }
+  // countdown overlay during the rollout raise
+  if (r.phase === "raise") {
+    const left = Math.max(0, Math.ceil((r.raiseDur - (performance.now() - r.raiseStart)) / 1000));
+    ctx.save();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    glowOn(10, "#ffae20"); ctx.fillStyle = "#ffce3a"; ctx.font = "bold 56px 'Courier New', monospace";
+    ctx.fillText("T-" + left, W / 2, H * 0.28);
+    glowOff();
+    ctx.fillStyle = "#9fe0ff"; ctx.font = "14px 'Courier New', monospace";
+    ctx.fillText(tr("ПОДЪЁМ РАКЕТЫ"), W / 2, H * 0.28 + 34);
+    ctx.fillStyle = "#788"; ctx.font = "12px 'Courier New', monospace";
+    ctx.fillText(tr("ENTER — ПРОПУСТИТЬ"), W / 2, H * 0.28 + 54);
     ctx.restore();
   }
   // brief white flash at each separation
@@ -4483,6 +4555,7 @@ function drawLaunchSurface(sX, gy) {
   // white assembly hangars (curved roofs, red trim — the spaceport's signature sheds)
   for (const s of launchSurface.sheds) {
     const x = sX(s.x); if (x + s.w < -20 || x > W + 20) continue;
+    if (s.destroyed) { drawRubble(x, gy, s.w, "#aeb4bc"); continue; }
     ctx.fillStyle = "#d4d8de"; ctx.fillRect(x, gy - s.h, s.w, s.h);             // white wall
     ctx.fillStyle = "#bcc1c9"; ctx.beginPath(); ctx.moveTo(x - 4, gy - s.h); ctx.quadraticCurveTo(x + s.w / 2, gy - s.h - 18, x + s.w + 4, gy - s.h); ctx.lineTo(x + s.w, gy - s.h); ctx.lineTo(x, gy - s.h); ctx.fill();  // arched roof
     ctx.fillStyle = "#c01818"; ctx.fillRect(x, gy - s.h, s.w, 3);               // red roofline band
@@ -4494,6 +4567,7 @@ function drawLaunchSurface(sX, gy) {
   const blink = Math.floor(performance.now() / 500) % 2 === 0;
   for (const t of launchSurface.towers) {
     const x = sX(t.x); if (x < -20 || x > W + 20) continue;
+    if (t.destroyed) continue;
     ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(x - 5, gy); ctx.lineTo(x, gy - t.h); ctx.lineTo(x + 5, gy); ctx.stroke();
     for (let yy = gy - 8; yy > gy - t.h; yy -= 16) { const f = (gy - yy) / t.h, w = 5 * (1 - f); ctx.beginPath(); ctx.moveTo(x - w, yy); ctx.lineTo(x + w, yy - 8); ctx.moveTo(x + w, yy); ctx.lineTo(x - w, yy - 8); ctx.stroke(); }
@@ -4502,6 +4576,7 @@ function drawLaunchSurface(sX, gy) {
   // radar dishes
   for (const d of launchSurface.dishes) {
     const x = sX(d.x); if (x < -30 || x > W + 30) continue;
+    if (d.destroyed) continue;
     ctx.strokeStyle = "#8a9099"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x, gy - 26); ctx.stroke();
     ctx.beginPath(); ctx.arc(x, gy - 30, 14, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
@@ -4584,6 +4659,7 @@ function drawLaunchSurface(sX, gy) {
   ctx.restore();
 }
 function drawGantry(sX, gy) {
+  if (launchSurface.gantryDead) return;
   const x0 = sX(0);
   if (n1()) {
     // a single tall lattice service tower on the LEFT, taller than the N1, with umbilical swing arms
