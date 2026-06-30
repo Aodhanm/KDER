@@ -2029,7 +2029,7 @@ function drawLKBody(noLegs) {
   // tiny, slow-blinking red beacon at the antenna tip (very small)
   { const on = Math.floor(performance.now() / 900) % 2 === 0;
     if (on) { glowOn(5, "#ff2a2a"); ctx.fillStyle = "#ff4b4b"; } else { glowOff(); ctx.fillStyle = "#3a1010"; }
-    ctx.beginPath(); ctx.arc(0, -17.4, 0.9, 0, Math.PI * 2); ctx.fill(); glowOff(); }
+    ctx.beginPath(); ctx.arc(0, -17.4, 1.15, 0, Math.PI * 2); ctx.fill(); glowOff(); }
   // engine flame
   if (throttle > 0.05 && fuel > 0 && (state === "play" || state === "ascent")) {
     const len = 5 + throttle * 20 + Math.random() * 6;
@@ -2042,7 +2042,7 @@ function drawShipAt(px, py, noLegs) {
   ctx.save();
   ctx.translate(px, py);
   ctx.rotate(ship.angle);
-  if (n1()) { drawLKBody(noLegs); ctx.restore(); return; }
+  if (n1()) { ctx.scale(1.15, 1.15); drawLKBody(noLegs); ctx.restore(); return; }
   glowOn(8);
   ctx.strokeStyle = FG; ctx.lineWidth = 2;
 
@@ -2114,6 +2114,7 @@ function drawSoyuzAt(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(SOYUZ_S, SOYUZ_S);
+  if (n1()) ctx.scale(1.1, 1.1);   // the LOK draws a touch bigger
   glowOn(7); ctx.strokeStyle = FG; ctx.lineWidth = 1.3;
   // orbital module (sphere) at the top + antenna (the LOK has no top antenna)
   ctx.beginPath(); ctx.arc(0, -13, 8, 0, Math.PI * 2); ctx.stroke();
@@ -2626,10 +2627,10 @@ function drawN1(opts) {
   const N = N1_STAGES.length;
   ctx.save();
   ctx.lineJoin = "round"; ctx.lineCap = "round";
-  const WHITE = "#e9eef3", GRAY = "#9aa0a8", RED = "#d23b2c";
+  const WHITE = "#e9eef3", GRAY = "#c2cad4", RED = "#d23b2c";
   const seg = (s) => {   // transparent: coloured outline only + a mid band ("lines in the middle")
     ctx.strokeStyle = s.white ? WHITE : GRAY;
-    glowOn(3, s.white ? "#cfe6ff" : "#aab4be"); ctx.lineWidth = 1.6;
+    glowOn(s.white ? 3 : 6, s.white ? "#cfe6ff" : "#cdd6e2"); ctx.lineWidth = s.white ? 1.6 : 2.1;
     ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(-s.wt, s.yt); ctx.moveTo(s.wb, s.yb); ctx.lineTo(s.wt, s.yt); ctx.stroke();   // slanted sides
     ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(s.wb, s.yb); ctx.stroke();                              // bottom ring (stage joint)
     ctx.lineWidth = 0.8; const my = (s.yb + s.yt) / 2, mw = (s.wb + s.wt) / 2; ctx.beginPath(); ctx.moveTo(-mw, my); ctx.lineTo(mw, my); ctx.stroke();   // mid band
@@ -2667,13 +2668,13 @@ function drawN1(opts) {
   // red СССР stacked down Block A (only while it's still attached)
   if (gone <= 0) {
     glowOn(2, "#ff3a3a"); ctx.fillStyle = RED;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 9px 'Courier New', monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 12px 'Courier New', monospace";
     const ll = cccp();
-    for (let i = 0; i < ll.length; i++) ctx.fillText(ll[i], 0, -18 + i * 9);
+    for (let i = 0; i < ll.length; i++) ctx.fillText(ll[i], 0, -24 + i * 12);
     glowOff();
   }
   // red star on the lowest white upper stage that's still present
-  { const si = Math.max(gone, 1), s = N1_STAGES[Math.min(si, N - 1)]; drawStar(0, (s.yb + s.yt) / 2, 3.6, 1.5, "#e22"); }
+  { const si = Math.max(gone, 1), s = N1_STAGES[Math.min(si, N - 1)]; drawStar(0, (s.yb + s.yt) / 2, 5, 2.1, "#e22"); }
   // engine flame at the current lowest remaining stage's base
   if (flame) {
     const s = N1_STAGES[Math.min(gone, N - 1)];
@@ -2909,7 +2910,7 @@ function rocketExplosionSound() {
   const t = audio.currentTime, sr = audio.sampleRate;
   const white = (dur, decay) => { const n = Math.floor(sr * dur), b = audio.createBuffer(1, n, sr), ch = b.getChannelData(0); for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); return b; };
   const brown = (dur, decay) => { const n = Math.floor(sr * dur), b = audio.createBuffer(1, n, sr), ch = b.getChannelData(0); let l = 0; for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; l = (l + 0.02 * w) / 1.02; ch[i] = l * 3.4 * Math.pow(1 - i / n, decay); } return b; };
-  const bus = audio.createGain(); bus.gain.value = n1() && rocket && rocket.stage === "rocket" ? 6.6 : 4.6;   // louder than the lander's 3.0; N1 bigger still
+  const bus = audio.createGain(); bus.gain.value = n1() && rocket && rocket.stage === "rocket" ? 5.6 : 4.6;   // louder than the lander's 3.0; N1 bigger still
   const comp = audio.createDynamicsCompressor(); comp.threshold.value = -28; comp.knee.value = 6; comp.ratio.value = 16; comp.attack.value = 0.001; comp.release.value = 0.35;
   bus.connect(comp); comp.connect(audio.destination);
   { const s = audio.createBufferSource(); s.buffer = white(0.06, 0.2); const g = audio.createGain(); g.gain.setValueAtTime(2.0, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08); s.connect(g); g.connect(bus); s.start(t); s.stop(t + 0.09); }
@@ -3009,13 +3010,13 @@ function razeSpaceport() {
   ls.gantryDead = true;
   const now = performance.now();
   const fc = ["#ff2a10", "#ff6a20", "#ffa83a", "#ffe06a", "#fff3b0", "#9a3526"];
-  for (let i = 0; i < 22; i++) launchFireballs.push({ x: rand(-640, 640), y: rand(-50, 60), t: now + rand(0, 600), big: rand(0.8, 1.7) });
-  for (let i = 0; i < 340; i++) { const a = rand(0, Math.PI * 2), s = rand(40, 460); launchParts.push({ x: rand(-640, 640), y: rand(-50, 30), vx: Math.cos(a) * s, vy: Math.abs(Math.sin(a) * s) + rand(0, 60), life: rand(0.8, 3.0), kind: "boom", col: fc[(Math.random() * fc.length) | 0] }); }
-  for (let i = 0; i < 120; i++) { const a = rand(0, Math.PI * 2), s = rand(40, 320); launchParts.push({ x: rand(-640, 640), y: rand(-50, 30), vx: Math.cos(a) * s, vy: Math.abs(Math.sin(a) * s), rot: rand(0, 6.28), vrot: rand(-12, 12), len: rand(5, 16), life: rand(1, 3), kind: "shard", col: ["#cdd2d8", "#9aa0a8", "#b8bcc4"][(Math.random() * 3) | 0] }); }
+  for (let i = 0; i < 12; i++) launchFireballs.push({ x: rand(-640, 640), y: rand(-50, 60), t: now + rand(0, 250), big: rand(0.7, 1.3) });
+  for (let i = 0; i < 150; i++) { const a = rand(0, Math.PI * 2), s = rand(40, 380); launchParts.push({ x: rand(-640, 640), y: rand(-50, 30), vx: Math.cos(a) * s, vy: Math.abs(Math.sin(a) * s) + rand(0, 50), life: rand(0.8, 2.4), kind: "boom", col: fc[(Math.random() * fc.length) | 0] }); }
+  for (let i = 0; i < 55; i++) { const a = rand(0, Math.PI * 2), s = rand(40, 280); launchParts.push({ x: rand(-640, 640), y: rand(-50, 30), vx: Math.cos(a) * s, vy: Math.abs(Math.sin(a) * s), rot: rand(0, 6.28), vrot: rand(-12, 12), len: rand(5, 14), life: rand(1, 2.6), kind: "shard", col: ["#cdd2d8", "#9aa0a8", "#b8bcc4"][(Math.random() * 3) | 0] }); }
 }
 function launchCrash(m) {
   rocket.phase = "crashed"; rocket.msg = m; rocket.boomTime = performance.now();
-  const big = n1() && rocket.stage === "rocket" ? 2.3 : 1;   // the fuelled N1 goes up far bigger
+  const big = n1() && rocket.stage === "rocket" ? 1.6 : 1;   // the fuelled N1 goes up bigger (but not so big it chokes)
   launchFireballs.push({ x: rocket.x, y: rocket.y + 20, t: performance.now(), big });
   destroyBuildings(rocket.x);
   destroyTanks(rocket.x);
@@ -3324,7 +3325,7 @@ function updateLaunch(dt) {
       const warmup = clamp((heavy ? 0.05 : 0.1) + wt * wt * (heavy ? 0.95 : 0.9), heavy ? 0.05 : 0.1, 1);
       // each stage has its own engine power: rocket full, Soyuz much less, the bare lander gentlest (Moon-like)
       const stageThrust = r.stage === "rocket" ? 1 : r.stage === "soyuz" ? 0.55 : 0.4;
-      thrust = L_THRUST * r.throttle * warmup * stageThrust * (heavy ? 1.5 : 1);
+      thrust = L_THRUST * r.throttle * warmup * stageThrust * (heavy ? 1.75 : 1);
       r.fuel -= L_FUEL_BURN * r.throttle * dt; if (r.fuel < 0) r.fuel = 0;
       if (Math.random() < r.throttle) spawnRocketExhaust();
     }
@@ -3340,7 +3341,7 @@ function updateLaunch(dt) {
         if (audioReady && thrustGain) { thrustGain.gain.setTargetAtTime(eng ? 0.5 : 0, audio.currentTime, 0.05); thrustFilter.frequency.setTargetAtTime(300 + r.throttle * 700, audio.currentTime, 0.05); }
       } else {
         if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.05);
-        if (eng) { rocketEngine.volume = Math.min(1, (0.3 + r.throttle * 0.6) * (n1() ? 1.3 : 1)); if (rocketEngine.paused) rocketEngine.play().catch(() => {}); }
+        if (eng) { rocketEngine.volume = Math.min(1, (0.3 + r.throttle * 0.6) * (n1() ? 1.5 : 1)); if (rocketEngine.paused) rocketEngine.play().catch(() => {}); }
         else { rocketEngine.volume = 0; if (!rocketEngine.paused) rocketEngine.pause(); }
       } }
     const k = SCALE * 3;
@@ -3464,7 +3465,7 @@ function drawLaunch() {
   for (const fb of launchFireballs) {
     const el = (nowMs - fb.t) / 1000, dur = 0.9 * fb.big;
     if (el > dur) continue;
-    const rad = (22 + el * 320) * fb.big, al = clamp(1 - el / dur, 0, 1), fx = sX(fb.x), fy = sY(fb.y);
+    const rad = Math.max(0, 22 + el * 320) * fb.big, al = clamp(1 - el / dur, 0, 1), fx = sX(fb.x), fy = sY(fb.y);
     const rg = ctx.createRadialGradient(fx, fy, 0, fx, fy, rad);
     rg.addColorStop(0, "rgba(255,244,190," + (0.9 * al).toFixed(2) + ")");
     rg.addColorStop(0.45, "rgba(255,120,30," + (0.7 * al).toFixed(2) + ")");
@@ -3513,7 +3514,7 @@ function drawLaunch() {
       if (flame) drawEngineFlame(0, 60, 3.2, 18);
       drawSoyuzAt(0, 0); drawDockedLander(!homecoming);    // gear only before the Moon (launch); none on re-entry
     } else if (n1()) {
-      ctx.scale(1.1, 1.1); ctx.translate(0, -30);
+      ctx.scale(1.2, 1.2); ctx.translate(0, -30);
       drawN1({ gone: 0, nose: true, flame });
     } else {
       ctx.scale(1.35, 1.35); ctx.translate(0, -18);
@@ -5042,7 +5043,7 @@ function drawIntro() {
 function drawIntroN1(el, p, cx) {
   if (introN1Token !== introStart) { introN1Token = introStart; introStage1 = introStage2 = introStage3 = false; }   // fresh run
   drawMoonAt(cx, H * 0.40 - p * 16, 40 + (p * p) * 250);
-  const bodyY = H * 0.60, bodySc = 1.25;
+  const bodyY = H * 0.60, bodySc = 1.35;
   // engine SFX while any main stage burns (louder for the N1); then off
   if (!introRocketDone) {
     if (p < 0.64) { if (!introRocketSnd) { introRocketSnd = true; try { rocketEngine.currentTime = 0; rocketEngine.volume = 0.95; rocketEngine.play().catch(() => {}); } catch (e) {} } }
@@ -5242,7 +5243,7 @@ function drawTitle() {
     // the N1 is much bigger, so it sits over on the LEFT, clear of the USSR map outline
     ctx.translate(W * 0.135, H * 0.40);
     ctx.rotate(0.4);
-    ctx.scale(0.6, 0.6);
+    ctx.scale(0.66, 0.66);
     drawN1({ gone: 0, nose: true, flame: true });
   } else {
     ctx.translate(W * 0.72, H * 0.135);
