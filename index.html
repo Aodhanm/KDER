@@ -227,17 +227,16 @@ const TITLE_BEAT = 0.5;    // seconds per beat (~120bpm — a stately march temp
 const TITLE_VOL = 0.22;
 let titleGain = null, titleTimer = null, titlePlaying = false;
 let musicMode = 1;   // 1 = original recordings (default), 2 = synthesized — applies to ALL music: title, gameplay, landing
-// original title music: the 11:46 -> 11:56 segment of title.mp3, played twice then a ~20s gap, looping
-const TM_START = 706, TM_END = 717;
+// original title music: the 11:46 -> 11:56 Internationale segment, played twice then a ~20s gap, looping.
+// Pre-cut into its own small file (title_clip.m4a) so it plays from 0 with NO deep seeking — iOS Safari
+// refuses to seek minutes into the 14 MB title.mp3 and would otherwise play the whole track.
 let tmCount = 0, tmTimeout = null;
-const titleAudio = new Audio("title.mp3"); titleAudio.volume = 0.55; titleAudio.preload = "auto";
-titleAudio.addEventListener("timeupdate", () => {
+const titleAudio = new Audio("title_clip.m4a"); titleAudio.volume = 0.55; titleAudio.preload = "auto";
+titleAudio.addEventListener("ended", () => {
   if (musicMode !== 1) return;
-  if (titleAudio.currentTime >= TM_END) {
-    tmCount++;
-    if (tmCount < 2) { try { titleAudio.currentTime = TM_START; } catch (e) {} }   // immediate repeat of the same part
-    else { titleAudio.pause(); tmCount = 0; titlePlaying = false; tmTimeout = setTimeout(() => { tmTimeout = null; if (onTitle && musicMode === 1) startTitleMusic(); }, 20000); }
-  }
+  tmCount++;
+  if (tmCount < 2) { try { titleAudio.currentTime = 0; } catch (e) {} titleAudio.play().catch(() => {}); }   // immediate repeat
+  else { tmCount = 0; titlePlaying = false; tmTimeout = setTimeout(() => { tmTimeout = null; if (onTitle && musicMode === 1) startTitleMusic(); }, 20000); }
 });
 // shim so the global mute toggle (M key) still works against both the synth bus and the mp3
 const titleMusic = { set muted(v) { if (titleGain) titleGain.gain.value = v ? 0 : TITLE_VOL; titleAudio.muted = v; } };
@@ -268,25 +267,13 @@ function scheduleTitleTune(startAt) {
 }
 function startTitleMusic() {
   if (!onTitle || titlePlaying) return;
-  if (musicMode === 1) {                          // original: the 11:46->11:56 Internationale segment of title.mp3
+  if (musicMode === 1) {                          // the pre-cut Internationale clip — just play it from 0
     if (tmTimeout) return;                         // currently in the ~20s gap — let it resume on its own
     tmCount = 0;
-    titlePlaying = true;
-    // Seek into title.mp3 to the segment. iOS Safari IGNORES a seek issued before the
-    // file's metadata has loaded, and plays the track from 0:00 instead ("wrong music").
-    // Fix: keep the play() call synchronous inside the user gesture (iOS requires that),
-    // then (re)apply the seek on the first event where the browser will honour it. Muted
-    // across the jump so the 0:00 blip isn't heard; un-muted on 'seeked' or a short
-    // fallback timeout so it can never get stuck silent.
-    titleAudio.muted = true;
-    let revealed = false;
-    const reveal = () => { if (revealed) return; revealed = true; titleAudio.muted = muted; };
-    const seek = () => { try { if (titleAudio.currentTime < TM_START - 2) titleAudio.currentTime = TM_START; } catch (e) {} };
-    seek();
+    titleAudio.muted = muted;
+    try { titleAudio.currentTime = 0; } catch (e) {}
     titleAudio.play().catch(() => {});
-    ["loadedmetadata", "canplay", "playing"].forEach(ev => titleAudio.addEventListener(ev, seek, { once: true }));
-    titleAudio.addEventListener("seeked", reveal, { once: true });
-    setTimeout(reveal, 1500);
+    titlePlaying = true;
     return;
   }
   // track 2 = the synthesized Internationale
