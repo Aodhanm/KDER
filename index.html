@@ -963,7 +963,13 @@ function launchAscent() {
   ship.vy = -14; ship.vx = 0; ship.angle = 0; camFocusY = ship.y;
   // climb back to the same Soyuz that's been waiting fixed overhead since undock
   if (!soyuz) soyuz = { x: wrapW(ship.x + rand(-50, 50)), y: SOYUZ_ALT, vx: 0, vy: 0 };
-  else soyuz.vx = 0;
+  else {
+    // if we launched from far across the Moon from the waiting Soyuz (e.g. a distant base / after WW3),
+    // bring it overhead so it's reachable instead of stranded; a normal nearby landing keeps it put
+    let dx = soyuz.x - ship.x; if (dx > WORLD / 2) dx -= WORLD; if (dx < -WORLD / 2) dx += WORLD;
+    if (Math.abs(dx) > W * 0.6) soyuz.x = wrapW(ship.x + rand(-40, 40));
+    soyuz.vx = 0; soyuz.vy = 0;
+  }
   asteroid = null; nextAsteroid = 0;
   state = "ascent"; msg = ""; timeLeft = 120; crashedInAscent = false;
 }
