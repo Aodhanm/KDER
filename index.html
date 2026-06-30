@@ -1057,7 +1057,7 @@ window.addEventListener("keydown", (e) => {
   // launch phase: arrows/space fly the rocket; A self-destructs; Enter skips / retries
   if (launching) {
     keys[e.key.toLowerCase()] = true;
-    if (e.key.toLowerCase() === "a" && rocket.phase === "fly") launchCrash("SELF-DESTRUCT");
+    if (e.key.toLowerCase() === "a" && (rocket.phase === "fly" || rocket.phase === "raise")) launchCrash("SELF-DESTRUCT");
     if (e.key.toLowerCase() === "x" && !e.repeat && rocket.phase === "fly") stageLaunch();
     if (e.key === "Enter") {
       if (rocket.phase === "raise") { rocket.phase = "fly"; rocket.angle = 0; try { countdown.pause(); } catch (e2) {} }
@@ -2628,12 +2628,15 @@ function drawN1(opts) {
   ctx.save();
   ctx.lineJoin = "round"; ctx.lineCap = "round";
   const WHITE = "#e9eef3", GRAY = "#c2cad4", RED = "#d23b2c";
-  const seg = (s) => {   // transparent: coloured outline only + a mid band ("lines in the middle")
+  const seg = (s) => {   // transparent: coloured outline + several detail bands + vertical seams
     ctx.strokeStyle = s.white ? WHITE : GRAY;
     glowOn(s.white ? 3 : 6, s.white ? "#cfe6ff" : "#cdd6e2"); ctx.lineWidth = s.white ? 1.6 : 2.1;
     ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(-s.wt, s.yt); ctx.moveTo(s.wb, s.yb); ctx.lineTo(s.wt, s.yt); ctx.stroke();   // slanted sides
     ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(s.wb, s.yb); ctx.stroke();                              // bottom ring (stage joint)
-    ctx.lineWidth = 0.8; const my = (s.yb + s.yt) / 2, mw = (s.wb + s.wt) / 2; ctx.beginPath(); ctx.moveTo(-mw, my); ctx.lineTo(mw, my); ctx.stroke();   // mid band
+    ctx.lineWidth = 0.8;   // horizontal detail bands
+    for (const f of [0.18, 0.4, 0.6, 0.82]) { const y = s.yb + (s.yt - s.yb) * f, w = s.wb + (s.wt - s.wb) * f; ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(w, y); ctx.stroke(); }
+    ctx.lineWidth = 0.6;   // vertical seam lines
+    for (const fx of [-0.55, -0.28, 0.28, 0.55]) { ctx.beginPath(); ctx.moveTo(s.wb * fx, s.yb); ctx.lineTo(s.wt * fx, s.yt); ctx.stroke(); }
     glowOff();
   };
   if (opts.only != null) { seg(N1_STAGES[opts.only]); ctx.restore(); return; }
@@ -2659,6 +2662,8 @@ function drawN1(opts) {
     ctx.stroke();
     ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(0, t.yt - 44); ctx.lineTo(0, t.yt - 58); ctx.stroke(); glowOff();
     glowOn(3, "#ff3a3a"); ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(0, t.yt - 60, 2, 0, Math.PI * 2); ctx.fill(); glowOff();
+    // a window on the payload capsule (the LOK Soyuz rides here, at the very top)
+    glowOn(5, "#cfe6ff"); ctx.strokeStyle = "#dfeaff"; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, t.yt - 17, 2.1, 0, Math.PI * 2); ctx.stroke(); glowOff();
   }
   // stages from the top down, plus a red lattice between each pair of still-attached stages
   for (let i = N - 1; i >= gone; i--) {
@@ -2673,12 +2678,19 @@ function drawN1(opts) {
     for (let i = 0; i < ll.length; i++) ctx.fillText(ll[i], 0, -24 + i * 12);
     glowOff();
   }
+  // ring of engine bells across the base of Block A (suggesting the N1's many-engine first stage)
+  if (gone <= 0) {
+    ctx.strokeStyle = GRAY; glowOn(4, "#cdd6e2"); ctx.lineWidth = 1.1;
+    const by = N1_STAGES[0].yb, bw = N1_STAGES[0].wb;
+    for (let k = -2.5; k <= 2.5; k++) { const bx = k * (bw - 4) / 2.5; ctx.beginPath(); ctx.moveTo(bx - 2.4, by); ctx.lineTo(bx - 1.4, by + 5); ctx.lineTo(bx + 1.4, by + 5); ctx.lineTo(bx + 2.4, by); ctx.stroke(); }
+    glowOff();
+  }
   // red star on the lowest white upper stage that's still present
   { const si = Math.max(gone, 1), s = N1_STAGES[Math.min(si, N - 1)]; drawStar(0, (s.yb + s.yt) / 2, 5, 2.1, "#e22"); }
-  // engine flame at the current lowest remaining stage's base
+  // engine flame at the current lowest remaining stage's base (big, fiery thrust)
   if (flame) {
     const s = N1_STAGES[Math.min(gone, N - 1)];
-    drawEngineFlame(0, s.yb, s.wb * 0.5, gone === 0 ? 60 : gone === 1 ? 48 : gone === 2 ? 38 : 28);
+    drawEngineFlame(0, s.yb + 4, s.wb * 0.62, gone === 0 ? 86 : gone === 1 ? 66 : gone === 2 ? 50 : 38);
   }
   ctx.restore();
 }
@@ -3022,7 +3034,7 @@ function launchCrash(m) {
   destroyTanks(rocket.x);
   flingPeopleNear(rocket.x);
   if (rocket.y < 150) razeSpaceport();   // an explosion on/near the pad takes the whole spaceport with it
-  try { rocketEngine.pause(); rocketEngine.volume = 0; } catch (e) {}
+  try { rocketEngine.pause(); rocketEngine.volume = 0; countdown.pause(); } catch (e) {}
   rocketExplosionSound();
   screamSound();
   const fc = ["#ff2a10", "#ff6a20", "#ffa83a", "#ffe06a", "#fff3b0"];
@@ -3341,7 +3353,7 @@ function updateLaunch(dt) {
         if (audioReady && thrustGain) { thrustGain.gain.setTargetAtTime(eng ? 0.5 : 0, audio.currentTime, 0.05); thrustFilter.frequency.setTargetAtTime(300 + r.throttle * 700, audio.currentTime, 0.05); }
       } else {
         if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.05);
-        if (eng) { rocketEngine.volume = Math.min(1, (0.3 + r.throttle * 0.6) * (n1() ? 1.5 : 1)); if (rocketEngine.paused) rocketEngine.play().catch(() => {}); }
+        if (eng) { rocketEngine.volume = Math.min(1, (0.3 + r.throttle * 0.6) * (n1() ? 1.65 : 1)); if (rocketEngine.paused) rocketEngine.play().catch(() => {}); }
         else { rocketEngine.volume = 0; if (!rocketEngine.paused) rocketEngine.pause(); }
       } }
     const k = SCALE * 3;
@@ -5187,23 +5199,10 @@ function drawTitle() {
   }
 
   // big red star + hammer & sickle, top centre (kept fully in frame)
-  const sx = W * 0.5, sy = H * 0.115, sr = 62;
+  const sx = W * 0.5, sy = H * 0.12, sr = 76;
   starPath(sx, sy, sr, sr * 0.42);
-  glowOn(22, "#ff3333"); ctx.fillStyle = "#d51616"; ctx.fill(); glowOff();
+  glowOn(24, "#ff3333"); ctx.fillStyle = "#d51616"; ctx.fill(); glowOff();
   if (hsReady) { const z = sr * 1.25; ctx.drawImage(hsImg, sx - z / 2, sy - z / 2, z, z); }
-
-  // extra decorative stars across the top half
-  if (!titleStars) {
-    titleStars = [];
-    for (let i = 0; i < 75; i++) titleStars.push({ x: rand(0, W), y: rand(14, H * 0.5), s: Math.random() < 0.82 ? 1 : 2, ph: rand(0, 6.28), tw: rand(0.6, 2.2) });
-  }
-  const tnow = now / 1000;
-  glowOn(5); ctx.fillStyle = FG;
-  for (const st of titleStars) {
-    ctx.globalAlpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(tnow * st.tw + st.ph));
-    ctx.fillRect(st.x, st.y, st.s, st.s);
-  }
-  ctx.globalAlpha = 1; glowOff();
 
 
   // lander slowly orbiting the Moon (always in view, never behind)
