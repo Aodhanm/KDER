@@ -210,7 +210,7 @@ let radioPlayed = false;
 const MUSIC_ON = true;   // music plays everywhere except the title screen
 function startBgm() {
   if (!MUSIC_ON || anthemActive) return;
-  if (musicMode === 2) { bgm.pause(); startMoonSynth(); return; }   // synthesized cosmonaut song
+  if (musicMode === 2) { bgm.pause(); stopMoonSynth(); return; }   // synth mode: no synthesized main/gameplay music (only the Internationale + anthems stay synth)
   stopMoonSynth();
   if (!bgmStarted) { bgmStarted = true; try { bgm.currentTime = 18; } catch (e) {} }
   bgm.muted = muted;
