@@ -197,7 +197,7 @@ function migJetSound() { const a = jetPool[jetIdx]; jetIdx = (jetIdx + 1) % jetP
 const usAnthem = new Audio("us_anthem.mp3"); usAnthem.volume = 0.85; usAnthem.preload = "auto"; usAnthem.load();
 // looping rocket-engine rumble (Earth-launch rocket only)
 const rocketEngine = new Audio("rocket_engine.mp3"); rocketEngine.loop = true; rocketEngine.volume = 0; rocketEngine.preload = "auto";
-const countdown = new Audio("countdown.mp3"); countdown.preload = "auto"; countdown.volume = 0.9;   // launch countdown played during the horizontal->vertical raise
+const countdown = new Audio("countdown.m4a"); countdown.preload = "auto"; countdown.volume = 0.9;   // launch countdown (1:55-2:00 of the compilation) played during the horizontal->vertical raise
 // cash-register "cha-ching" for the SF payout
 const cashAudio = new Audio("cash_register.mp3"); cashAudio.volume = 0.9; cashAudio.preload = "auto";
 // honor-cannon report (pool)
