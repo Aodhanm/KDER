@@ -710,7 +710,7 @@ let introNosed = false;    // one-shot: nose-fairing separation sound
 let introDebris = [];      // little bits flung off at the nose-fairing separation
 let introFlashed = false;  // one-shot: neon twinkle as the stack vanishes into the Moon
 let introFlashTime = 0;
-let introN1Token = 0, introStage1 = false, introStage2 = false;   // N1 staging one-shots (reset per intro)
+let introN1Token = 0, introStage1 = false, introStage2 = false, introStage3 = false;   // N1 staging one-shots (reset per intro)
 let introRocketSnd = false, introRocketDone = false;  // rocket-thrust SFX: runs while the core thrusts, then off
 let introLanderSnd = false, introLanderDone = false;  // lander-thrust SFX: ~1s as it fires down into the Moon
 // kill any cutscene engine sounds (on skip / Escape / cutscene end)
@@ -744,9 +744,10 @@ function n1() { return rocketType === "n1"; }
 // cone segment [yb,yt] with half-widths [wb,wt]; red open-lattice interstages bridge the gaps. White
 // upper stages, gray Block A at the base — much bigger than the Vostok.
 const N1_STAGES = [
-  { yb: 22,  yt: -34,  wb: 23,   wt: 17,  white: false },  // Block A — stage 1 (gray, widest)
-  { yb: -44, yt: -90,  wb: 16,   wt: 11,  white: true  },  // Block B — stage 2
-  { yb: -98, yt: -134, wb: 10.5, wt: 7,   white: true  },  // Block V — stage 3
+  { yb: 30,   yt: -38,  wb: 27,  wt: 20,  white: false },  // Block A — stage 1 (gray, widest)
+  { yb: -48,  yt: -100, wb: 19,  wt: 14,  white: true  },  // Block B — stage 2
+  { yb: -110, yt: -156, wb: 13,  wt: 9,   white: true  },  // Block V — stage 3
+  { yb: -166, yt: -204, wb: 8.5, wt: 5.5, white: true  },  // Block G — stage 4 (extra compartment)
 ];
 const ALT_FT = 4;        // displayed feet per internal altitude unit
 let titleStars = null;   // extra decorative starfield for the title's top half
@@ -2017,12 +2018,12 @@ function drawLKBody(noLegs) {
     }
   }
   glowOff();
-  // red star centered on the middle drum (kept clear of the body outlines)
-  drawStar(0, 2.2, 2.2, 0.95, "#e22");
-  // a clear round porthole centered on the cabin: metal rim + light-blue glass + a highlight
+  // red star centered on the middle drum (a little bigger), kept clear of the body outlines
+  drawStar(0, 2.2, 2.6, 1.1, "#e22");
+  // a clear round porthole centered on the cabin: metal rim + inner ring + highlight (no blue tint)
   ctx.save();
   glowOn(5); ctx.strokeStyle = FG; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, -6.5, 3, 0, Math.PI * 2); ctx.stroke();
-  glowOn(6, "#bfe9ff"); ctx.fillStyle = "#bfe9ff"; ctx.beginPath(); ctx.arc(0, -6.5, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, -6.5, 1.8, 0, Math.PI * 2); ctx.stroke();
   glowOff(); ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(-0.9, -7.4, 0.7, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
   // tiny, slow-blinking red beacon at the antenna tip (very small)
@@ -2114,15 +2115,9 @@ function drawSoyuzAt(x, y) {
   ctx.translate(x, y);
   ctx.scale(SOYUZ_S, SOYUZ_S);
   glowOn(7); ctx.strokeStyle = FG; ctx.lineWidth = 1.3;
-  // orbital module (sphere) at the top + antenna
+  // orbital module (sphere) at the top + antenna (the LOK has no top antenna)
   ctx.beginPath(); ctx.arc(0, -13, 8, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, -21); ctx.lineTo(0, -25); ctx.stroke();
-  if (n1()) {   // LOK: a high-gain parabolic dish atop the orbital module (sets it apart from the basic Soyuz)
-    ctx.save(); ctx.translate(-3, -25);
-    ctx.beginPath(); ctx.arc(0, 1, 5, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(3, 4); ctx.stroke();
-    ctx.restore();
-  }
+  if (!n1()) { ctx.beginPath(); ctx.moveTo(0, -21); ctx.lineTo(0, -25); ctx.stroke(); }
   // service module
   ctx.beginPath(); ctx.rect(-8, -5, 16, 13); ctx.stroke();
   if (n1()) {
@@ -2618,65 +2613,71 @@ function drawNoseCone() {
   ctx.restore();
 }
 
-// the Soviet N1 — a big tapered cone with red open-lattice interstages, white upper stages, a gray
-// Block A at the base, and red СССР down the side. opts:
-//   gone  — how many bottom stages have been jettisoned (0 = full stack … 3 = bare payload)
+// the Soviet N1 — a big tapered cone with red open-lattice interstages. Drawn as transparent line-art
+// (no fill) like the Vostok, but with white/gray coloured outlines, red lattice, mid bands, star + СССР.
+// opts:
+//   gone  — how many bottom stages have been jettisoned (0 = full stack … N = bare payload)
 //   nose  — fairing + escape tower present (default true)
 //   flame — the current lowest remaining stage is firing
+//   only  — draw ONLY this one stage segment (used for a jettisoned stage tumbling away)
 function drawN1(opts) {
   opts = opts || {};
   const gone = opts.gone || 0, nose = opts.nose !== false, flame = opts.flame;
+  const N = N1_STAGES.length;
   ctx.save();
   ctx.lineJoin = "round"; ctx.lineCap = "round";
-  const WHITE = "#e9eef3", GRAY = "#878d95", RED = "#d23b2c", OUT = "#2b3036";
-  const seg = (s) => {
-    ctx.beginPath();
-    ctx.moveTo(-s.wb, s.yb); ctx.lineTo(-s.wt, s.yt); ctx.lineTo(s.wt, s.yt); ctx.lineTo(s.wb, s.yb); ctx.closePath();
-    ctx.fillStyle = s.white ? WHITE : GRAY; ctx.fill();
-    ctx.strokeStyle = OUT; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.lineWidth = 0.7;   // a couple of faint body bands
-    for (const f of [0.34, 0.67]) { const y = s.yb + (s.yt - s.yb) * f, w = s.wb + (s.wt - s.wb) * f; ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(w, y); ctx.stroke(); }
+  const WHITE = "#e9eef3", GRAY = "#9aa0a8", RED = "#d23b2c";
+  const seg = (s) => {   // transparent: coloured outline only + a mid band ("lines in the middle")
+    ctx.strokeStyle = s.white ? WHITE : GRAY;
+    glowOn(3, s.white ? "#cfe6ff" : "#aab4be"); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(-s.wt, s.yt); ctx.moveTo(s.wb, s.yb); ctx.lineTo(s.wt, s.yt); ctx.stroke();   // slanted sides
+    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(s.wb, s.yb); ctx.stroke();                              // bottom ring (stage joint)
+    ctx.lineWidth = 0.8; const my = (s.yb + s.yt) / 2, mw = (s.wb + s.wt) / 2; ctx.beginPath(); ctx.moveTo(-mw, my); ctx.lineTo(mw, my); ctx.stroke();   // mid band
+    glowOff();
   };
+  if (opts.only != null) { seg(N1_STAGES[opts.only]); ctx.restore(); return; }
   const lat = (yb, yt, wb, wt) => {   // red open-lattice interstage truss
-    ctx.strokeStyle = RED; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = RED; glowOn(3, "#ff3a3a"); ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(-wb, yb); ctx.lineTo(-wt, yt); ctx.moveTo(wb, yb); ctx.lineTo(wt, yt); ctx.stroke();   // outer legs
     ctx.beginPath(); ctx.moveTo(-wb, yb); ctx.lineTo(wb, yb); ctx.moveTo(-wt, yt); ctx.lineTo(wt, yt); ctx.stroke();   // rings
     ctx.lineWidth = 1.0;
-    const N = 4;
-    for (let i = 0; i < N; i++) {
-      const y0 = yb + (yt - yb) * (i / N), y1 = yb + (yt - yb) * ((i + 1) / N);
-      const w0 = wb + (wt - wb) * (i / N), w1 = wb + (wt - wb) * ((i + 1) / N);
+    const NB = 4;
+    for (let i = 0; i < NB; i++) {
+      const y0 = yb + (yt - yb) * (i / NB), y1 = yb + (yt - yb) * ((i + 1) / NB);
+      const w0 = wb + (wt - wb) * (i / NB), w1 = wb + (wt - wb) * ((i + 1) / NB);
       ctx.beginPath(); ctx.moveTo(-w0, y0); ctx.lineTo(w1, y1); ctx.moveTo(w0, y0); ctx.lineTo(-w1, y1); ctx.stroke();   // X cross-brace
     }
+    glowOff();
   };
-  // payload fairing (over the LOK + LK) + launch-escape tower, on top of Block V
+  // payload fairing (over the LOK + LK) + launch-escape tower, on top of the topmost stage
   if (nose) {
-    const t = N1_STAGES[2];
+    const t = N1_STAGES[N - 1];
+    glowOn(3, "#cfe6ff"); ctx.strokeStyle = WHITE; ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(-t.wt, t.yt); ctx.lineTo(-4.5, t.yt - 16); ctx.lineTo(-3, t.yt - 30); ctx.lineTo(0, t.yt - 44); ctx.lineTo(3, t.yt - 30); ctx.lineTo(4.5, t.yt - 16); ctx.lineTo(t.wt, t.yt);
-    ctx.closePath(); ctx.fillStyle = WHITE; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.strokeStyle = OUT; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(0, t.yt - 44); ctx.lineTo(0, t.yt - 58); ctx.stroke();
-    ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(0, t.yt - 60, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.moveTo(-t.wt, t.yt); ctx.lineTo(-3.5, t.yt - 16); ctx.lineTo(-2.5, t.yt - 30); ctx.lineTo(0, t.yt - 44); ctx.lineTo(2.5, t.yt - 30); ctx.lineTo(3.5, t.yt - 16); ctx.lineTo(t.wt, t.yt);
+    ctx.stroke();
+    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(0, t.yt - 44); ctx.lineTo(0, t.yt - 58); ctx.stroke(); glowOff();
+    glowOn(3, "#ff3a3a"); ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(0, t.yt - 60, 2, 0, Math.PI * 2); ctx.fill(); glowOff();
   }
-  // stages + their interstages, drawn top-down; only those still attached
-  seg(N1_STAGES[2]);
-  if (gone <= 1) { lat(N1_STAGES[1].yt, N1_STAGES[2].yb, N1_STAGES[1].wt, N1_STAGES[2].wb); seg(N1_STAGES[1]); }
-  if (gone <= 0) { lat(N1_STAGES[0].yt, N1_STAGES[1].yb, N1_STAGES[0].wt, N1_STAGES[1].wb); seg(N1_STAGES[0]); }
-  // red СССР stacked down the gray Block A
+  // stages from the top down, plus a red lattice between each pair of still-attached stages
+  for (let i = N - 1; i >= gone; i--) {
+    seg(N1_STAGES[i]);
+    if (i > gone) lat(N1_STAGES[i - 1].yt, N1_STAGES[i].yb, N1_STAGES[i - 1].wt, N1_STAGES[i].wb);
+  }
+  // red СССР stacked down Block A (only while it's still attached)
   if (gone <= 0) {
     glowOn(2, "#ff3a3a"); ctx.fillStyle = RED;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 8px 'Courier New', monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = "bold 9px 'Courier New', monospace";
     const ll = cccp();
-    for (let i = 0; i < ll.length; i++) ctx.fillText(ll[i], 0, -16 + i * 8);
+    for (let i = 0; i < ll.length; i++) ctx.fillText(ll[i], 0, -18 + i * 9);
     glowOff();
   }
-  // small red star on the white upper body
-  drawStar(0, -68, 3.4, 1.4, "#e22");
+  // red star on the lowest white upper stage that's still present
+  { const si = Math.max(gone, 1), s = N1_STAGES[Math.min(si, N - 1)]; drawStar(0, (s.yb + s.yt) / 2, 3.6, 1.5, "#e22"); }
   // engine flame at the current lowest remaining stage's base
   if (flame) {
-    const yb = gone < 3 ? N1_STAGES[gone].yb : 22;
-    const w = gone < 3 ? N1_STAGES[gone].wb * 0.5 : 4;
-    drawEngineFlame(0, yb, w, gone === 0 ? 56 : gone === 1 ? 42 : 30);
+    const s = N1_STAGES[Math.min(gone, N - 1)];
+    drawEngineFlame(0, s.yb, s.wb * 0.5, gone === 0 ? 60 : gone === 1 ? 48 : gone === 2 ? 38 : 28);
   }
   ctx.restore();
 }
@@ -3482,7 +3483,7 @@ function drawLaunch() {
     const X = sX(d.x), Y = sY(d.y);
     if (X < -140 || X > W + 140 || Y > H + 220) continue;
     ctx.save(); ctx.translate(X, Y); ctx.rotate(d.rot); ctx.globalAlpha = clamp(d.life / 1.4, 0, 1);
-    if (d.kind === "rocket") { if (n1()) { ctx.scale(1.1, 1.1); ctx.translate(0, -22); drawN1({ gone: 0, nose: false, flame: false }); } else { ctx.scale(1.35, 1.35); ctx.translate(0, -18); drawRocket(false, 24, true); } }
+    if (d.kind === "rocket") { if (n1()) { ctx.scale(0.95, 0.95); ctx.translate(0, -30); drawN1({ gone: 0, nose: false, flame: false }); } else { ctx.scale(1.35, 1.35); ctx.translate(0, -18); drawRocket(false, 24, true); } }
     else { ctx.scale(0.5, 0.5); drawSoyuzAt(0, 0); }
     ctx.globalAlpha = 1; ctx.restore();
   }
@@ -3512,7 +3513,7 @@ function drawLaunch() {
       if (flame) drawEngineFlame(0, 60, 3.2, 18);
       drawSoyuzAt(0, 0); drawDockedLander(!homecoming);    // gear only before the Moon (launch); none on re-entry
     } else if (n1()) {
-      ctx.scale(1.25, 1.25); ctx.translate(0, -22);
+      ctx.scale(1.1, 1.1); ctx.translate(0, -30);
       drawN1({ gone: 0, nose: true, flame });
     } else {
       ctx.scale(1.35, 1.35); ctx.translate(0, -18);
@@ -4730,6 +4731,18 @@ function drawRubble(x, gy, w, col) {
 function drawMount(sX, top, bot) {
   if (top > H + 30 || bot < -30) return;
   const x0 = sX(0);
+  if (n1()) {
+    // the N1 sat on a flat, low launch table — an open framework barely off the ground, not a tall pedestal
+    ctx.save(); glowOff();
+    ctx.fillStyle = "#565c64"; ctx.fillRect(x0 - 66, top, 132, 6);                 // flat deck at the rocket base
+    ctx.strokeStyle = "#3a4048"; ctx.lineWidth = 2; ctx.strokeRect(x0 - 66, top, 132, 6);
+    ctx.strokeStyle = "#4a505a"; ctx.lineWidth = 3;
+    for (const lx of [-54, -24, 24, 54]) { ctx.beginPath(); ctx.moveTo(x0 + lx, top + 6); ctx.lineTo(x0 + lx * 0.78, bot); ctx.stroke(); }   // short splayed legs to the ground
+    ctx.strokeStyle = "#c4302a"; ctx.lineWidth = 3;                                  // red hold-down arms
+    ctx.beginPath(); ctx.moveTo(x0 - 30, top); ctx.lineTo(x0 - 15, top - 4); ctx.moveTo(x0 + 30, top); ctx.lineTo(x0 + 15, top - 4); ctx.stroke();
+    ctx.restore();
+    return;
+  }
   ctx.save(); glowOff();
   ctx.fillStyle = "#565c64";
   ctx.beginPath(); ctx.moveTo(x0 - 22, top); ctx.lineTo(x0 + 22, top); ctx.lineTo(x0 + 40, bot); ctx.lineTo(x0 - 40, bot); ctx.closePath(); ctx.fill();
@@ -5027,46 +5040,49 @@ function drawIntro() {
 // the N1 fly-to-the-Moon cutscene: stages drop piece by piece (Block A → B → V), each new stage
 // firing its own engine, then the fairing jettisons and the LOK + LK deploy and fly down into the Moon
 function drawIntroN1(el, p, cx) {
-  if (introN1Token !== introStart) { introN1Token = introStart; introStage1 = introStage2 = false; }   // fresh run
+  if (introN1Token !== introStart) { introN1Token = introStart; introStage1 = introStage2 = introStage3 = false; }   // fresh run
   drawMoonAt(cx, H * 0.40 - p * 16, 40 + (p * p) * 250);
-  const bodyY = H * 0.58, bodySc = 1.7;
+  const bodyY = H * 0.60, bodySc = 1.25;
   // engine SFX while any main stage burns (louder for the N1); then off
   if (!introRocketDone) {
-    if (p < 0.62) { if (!introRocketSnd) { introRocketSnd = true; try { rocketEngine.currentTime = 0; rocketEngine.volume = 0.95; rocketEngine.play().catch(() => {}); } catch (e) {} } }
+    if (p < 0.64) { if (!introRocketSnd) { introRocketSnd = true; try { rocketEngine.currentTime = 0; rocketEngine.volume = 0.95; rocketEngine.play().catch(() => {}); } catch (e) {} } }
     else { introRocketDone = true; try { rocketEngine.pause(); rocketEngine.volume = 0; rocketEngine.currentTime = 0; } catch (e) {} }
   }
   // LK thruster SFX as the stack fires down into the Moon
-  if (!introLanderDone && p >= 0.70) {
+  if (!introLanderDone && p >= 0.74) {
     if (!introLanderSnd) { introLanderSnd = true; if (audioReady && thrustGain) { thrustGain.gain.setTargetAtTime(0.5, audio.currentTime, 0.03); thrustFilter.frequency.setTargetAtTime(640, audio.currentTime, 0.03); } }
-    if (el - 0.70 * INTRO_DUR > 1200) { introLanderDone = true; if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.06); }
+    if (el - 0.74 * INTRO_DUR > 1200) { introLanderDone = true; if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.06); }
   }
-  const stack = (gone, nose, flame, dy) => { ctx.save(); ctx.translate(cx, bodyY + (dy || 0)); ctx.scale(bodySc, bodySc); drawN1({ gone, nose, flame }); ctx.restore(); };
-  const fall = (gone, prog) => { ctx.save(); ctx.globalAlpha = clamp(1 - prog, 0, 1); ctx.translate(cx + prog * 24, bodyY + 80 + prog * 300); ctx.rotate(prog * 0.6); ctx.scale(bodySc * 0.95, bodySc * 0.95); drawN1({ gone, nose: false, flame: false }); ctx.restore(); };
+  const stack = (gone, nose, flame) => { ctx.save(); ctx.translate(cx, bodyY); ctx.scale(bodySc, bodySc); drawN1({ gone, nose, flame }); ctx.restore(); };
+  const fall = (idx, prog) => { ctx.save(); ctx.globalAlpha = clamp(1 - prog, 0, 1); ctx.translate(cx + prog * 26, bodyY + 90 + prog * 320); ctx.rotate(prog * 0.6); ctx.scale(bodySc * 0.95, bodySc * 0.95); drawN1({ only: idx }); ctx.restore(); };
   const flash = (a) => { if (a > 0) { ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H); ctx.restore(); } };
 
-  if (p < 0.16) {                                  // ASCENT — full stack, Block A burning
+  if (p < 0.12) {                                  // ASCENT — full stack, Block A burning
     stack(0, true, true);
-  } else if (p < 0.24) {                           // STAGE 1 SEP — Block A drops, Block B ignites
+  } else if (p < 0.18) {                           // STAGE 1 SEP — Block A drops, Block B ignites
     if (!introStage1) { introStage1 = true; stagingSound(); }
-    const sp = (p - 0.16) / 0.08;
-    fall(0, sp); stack(1, true, true); flash((1 - sp) * 0.55);
-  } else if (p < 0.40) {                           // STAGE 2 BURN
+    const sp = (p - 0.12) / 0.06; fall(0, sp); stack(1, true, true); flash((1 - sp) * 0.5);
+  } else if (p < 0.30) {                           // STAGE 2 BURN
     stack(1, true, true);
-  } else if (p < 0.48) {                           // STAGE 2 SEP — Block B drops, Block V ignites
+  } else if (p < 0.36) {                           // STAGE 2 SEP — Block B drops, Block V ignites
     if (!introStage2) { introStage2 = true; stagingSound(); }
-    const sp = (p - 0.40) / 0.08;
-    fall(1, sp); stack(2, true, true); flash((1 - sp) * 0.55);
-  } else if (p < 0.62) {                           // STAGE 3 BURN
+    const sp = (p - 0.30) / 0.06; fall(1, sp); stack(2, true, true); flash((1 - sp) * 0.5);
+  } else if (p < 0.48) {                           // STAGE 3 BURN
     stack(2, true, true);
-  } else if (p < 0.70) {                           // FAIRING JETTISON + LOK/LK DEPLOY
+  } else if (p < 0.54) {                           // STAGE 3 SEP — Block V drops, Block G ignites
+    if (!introStage3) { introStage3 = true; stagingSound(); }
+    const sp = (p - 0.48) / 0.06; fall(2, sp); stack(3, true, true); flash((1 - sp) * 0.5);
+  } else if (p < 0.64) {                           // STAGE 4 BURN (Block G)
+    stack(3, true, true);
+  } else if (p < 0.74) {                           // FAIRING JETTISON + LOK/LK DEPLOY
     if (!introNosed) { introNosed = true; undockThrusterSound(); }
-    const np = (p - 0.62) / 0.08;
-    stack(2, false, np < 0.5);
-    const topY = bodyY - 134 * bodySc, syc = topY - np * 64, ssc = 0.9 + np * 0.25;
+    const np = (p - 0.64) / 0.10;
+    stack(3, false, np < 0.5);
+    const topY = bodyY + N1_STAGES[N1_STAGES.length - 1].yt * bodySc, syc = topY - np * 70, ssc = 0.9 + np * 0.25;
     ctx.save(); ctx.translate(cx, syc); ctx.scale(ssc, ssc); drawSoyuzAt(0, 0); drawDockedLander(); ctx.restore();
     flash((0.2 - np) * 1.2);
   } else {                                         // LOK+LK descend into the Moon, vanish in a twinkle
-    const lp = (p - 0.70) / 0.30, my = H * 0.40 - p * 16;
+    const lp = (p - 0.74) / 0.26, my = H * 0.40 - p * 16;
     const e = lp * lp * (3 - 2 * lp), ly = H * 0.30 + (my - H * 0.30) * e, sc = Math.max(0, 1.2 - 1.45 * e);
     if (sc > 0.04) {
       const baseY = ly + 63 * sc, fl = 22 * sc + Math.sin(performance.now() / 60) * 6;
@@ -5220,12 +5236,20 @@ function drawTitle() {
   }
 
 
-  // one rocket climbing toward the Moon — tucked between the Moon and the map, clear of both
+  // one rocket climbing toward the Moon — the chosen rocket (Vostok or N1) alternates here too
   ctx.save();
-  ctx.translate(W * 0.72, H * 0.135);
-  ctx.rotate(0.5);
-  ctx.scale(1.2, 1.2);
-  drawRocket(true, 0);
+  if (n1()) {
+    // the N1 is much bigger, so it sits over on the LEFT, clear of the USSR map outline
+    ctx.translate(W * 0.135, H * 0.40);
+    ctx.rotate(0.4);
+    ctx.scale(0.6, 0.6);
+    drawN1({ gone: 0, nose: true, flame: true });
+  } else {
+    ctx.translate(W * 0.72, H * 0.135);
+    ctx.rotate(0.5);
+    ctx.scale(1.2, 1.2);
+    drawRocket(true, 0);
+  }
   ctx.restore();
 
   // traced USSR outline (neon red) with СССР spread out inside it — the centerpiece
