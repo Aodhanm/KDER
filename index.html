@@ -5253,18 +5253,27 @@ function drawTitle() {
   }
 
 
-  // one rocket climbing toward the Moon — the chosen rocket alternates here; an asteroid can blow it up
-  const rkX = W * 0.135, rkY = H * 0.40;
-  if (titleAsteroid && now >= rocketDeadUntil && Math.hypot(titleAsteroid.x - rkX, titleAsteroid.y - rkY) < titleAsteroid.r + (n1() ? 28 : 16)) {
-    titleBoom(rkX, rkY, n1() ? 1.9 : 1.1);
-    rocketDeadUntil = now + 7000;
-    titleAsteroid = null; nextTitleAst = now + rand(6000, 14000);
+  // one rocket climbing toward the Moon — the chosen rocket alternates here; an asteroid blows it up
+  const rkX = W * 0.135, rkY = H * 0.40, rkRot = 0.4, rkSc = n1() ? 0.66 : 1.25;
+  const yBot = n1() ? 30 : 18, yTop = n1() ? -262 : -70;   // local body extents (base -> nose tip)
+  if (titleAsteroid && now >= rocketDeadUntil) {
+    for (let s = 0; s <= 1.0001; s += 0.2) {   // sample the whole body axis, not just the centre
+      const ly = (yBot + (yTop - yBot) * s) * rkSc;
+      const px = rkX - ly * Math.sin(rkRot), py = rkY + ly * Math.cos(rkRot);
+      if (Math.hypot(titleAsteroid.x - px, titleAsteroid.y - py) < titleAsteroid.r + 14) {
+        const my = (yBot + yTop) / 2 * rkSc;
+        titleBoom(rkX - my * Math.sin(rkRot), rkY + my * Math.cos(rkRot), n1() ? 1.9 : 1.2);
+        rocketDeadUntil = now + 7000;
+        titleAsteroid = null; nextTitleAst = now + rand(6000, 14000);
+        break;
+      }
+    }
   }
   if (now >= rocketDeadUntil) {
     ctx.save();
-    ctx.translate(rkX, rkY); ctx.rotate(0.4);
-    if (n1()) { ctx.scale(0.66, 0.66); drawN1({ gone: 0, nose: true, flame: true }); }
-    else { ctx.scale(1.25, 1.25); drawRocket(true, 0); }
+    ctx.translate(rkX, rkY); ctx.rotate(rkRot); ctx.scale(rkSc, rkSc);
+    if (n1()) drawN1({ gone: 0, nose: true, flame: true });
+    else drawRocket(true, 0);
     ctx.restore();
   }
 
