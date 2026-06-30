@@ -936,8 +936,10 @@ function newGame(withTransmission = true) {
 
 // Phase 2: liftoff — ascent stage separates from the landing gear, fuel topped up by pad
 function startAscent() {
-  // clear any landing celebration / anthem, restore game sound
-  if (anthemActive) { anthemActive = false; anthem.pause(); if (masterGain) masterGain.gain.value = 0.6; startBgm(); }
+  // clear any landing celebration / anthem; stop the WW3 blast and bring gameplay music back as we launch to the Soyuz
+  if (anthemActive) { anthemActive = false; anthem.pause(); if (masterGain) masterGain.gain.value = 0.6; }
+  restoreMasterAudio();   // un-mute the bus + stop the WW3 nuke if we launched straight out of WW3
+  startBgm();             // music plays again on the climb to the Soyuz
   celebrating = false;   // the planted flag stays on the Moon through the climb
   gear = { x: ship.x, y: ship.y, angle: ship.angle };   // legs stay on the surface
   const bonus = landedPad ? landedPad.mult * 100 : 200;  // x5 most ... x2 least (tune later)
