@@ -200,6 +200,8 @@ const rocketEngine = new Audio("rocket_engine.mp3"); rocketEngine.loop = true; r
 const countdown = new Audio("countdown.m4a"); countdown.preload = "auto"; countdown.volume = 0.9;   // launch countdown (1:55-2:00 of the compilation) played during the horizontal->vertical raise
 const ww3Audio = new Audio("ww3_boom.m4a"); ww3Audio.preload = "auto"; ww3Audio.volume = 1;   // nuclear blast for WW3 (clip already begins at the 10s mark); everything else goes silent
 ww3Audio.addEventListener("ended", () => { if (masterGain && audio) masterGain.gain.setTargetAtTime(0.6, audio.currentTime, 0.4); });
+// HARD-mode Red Square fanfare: the 21:22->end Internationale clip (replaces the Soviet anthem on a hard win only)
+const internAudio = new Audio("internationale.m4a"); internAudio.preload = "auto"; internAudio.volume = 0.92;
 // cash-register "cha-ching" for the SF payout
 const cashAudio = new Audio("cash_register.mp3"); cashAudio.volume = 0.9; cashAudio.preload = "auto";
 // honor-cannon report (pool)
@@ -1136,7 +1138,7 @@ window.addEventListener("keydown", (e) => {
   // Escape returns to the title menu from anywhere
   if (e.key === "Escape") {
     onTitle = true; intro = false; launching = false;
-    alarm.pause(); stopBgm(); stopSsbSynth(); anthem.pause(); usAnthem.pause(); stopIntroSounds();
+    alarm.pause(); stopBgm(); stopSsbSynth(); anthem.pause(); usAnthem.pause(); internAudio.pause(); stopIntroSounds();
     if (anthemActive) { anthemActive = false; if (masterGain) masterGain.gain.value = 0.6; }
     restoreMasterAudio();   // also un-mutes if we Escaped out of WW3
     startTitleMusic();
@@ -1156,8 +1158,8 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       if (rocket.phase === "raise") { rocket.phase = "fly"; rocket.angle = 0; try { countdown.pause(); } catch (e2) {} }
       else if (rocket.phase === "crashed") { if (homecoming) startHomecoming(homecoming); else startLaunch(); }
-      else if (rocket.phase === "landed" && homecoming) { anthem.pause(); usAnthem.pause(); stopSsbSynth(); stopAllMigEngines(); launching = false; homecoming = null; onTitle = true; startTitleMusic(); }   // homecoming win -> title
-      else if (rocket.phase === "landed") { anthem.pause(); usAnthem.pause(); stopSsbSynth(); stopAllMigEngines(); startBgm(); startLaunch(); }
+      else if (rocket.phase === "landed" && homecoming) { anthem.pause(); usAnthem.pause(); internAudio.pause(); stopSsbSynth(); stopAllMigEngines(); launching = false; homecoming = null; onTitle = true; startTitleMusic(); }   // homecoming win -> title
+      else if (rocket.phase === "landed") { anthem.pause(); usAnthem.pause(); internAudio.pause(); stopSsbSynth(); stopAllMigEngines(); startBgm(); startLaunch(); }
       else { launching = false; intro = true; introStart = performance.now(); introStaged = false; introNosed = false; introFlashed = false; introRocketSnd = introRocketDone = introLanderSnd = introLanderDone = false; try { rocketEngine.pause(); rocketEngine.volume = 0; } catch (e) {} if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.02); }
     }
     return;
@@ -3276,12 +3278,13 @@ function landCity(city) {
   stopBgm();
   // landing on Red Square BEFORE going to the Moon = desertion: a tank rolls in and destroys you
   if (city === "moscow" && !homecoming) { startDesertion(); return; }
-  // San Francisco gets the US anthem; Moscow gets the Soviet anthem
-  anthem.pause(); usAnthem.pause(); stopSsbSynth();
+  // San Francisco gets the US anthem; Moscow gets the Soviet anthem (HARD win = the Internationale clip)
+  anthem.pause(); usAnthem.pause(); internAudio.pause(); stopSsbSynth();
   if (city === "sf") {
     if (musicMode === 2) playSsbSynth();   // synthesized Star-Spangled Banner
     else { usAnthem.muted = muted; try { usAnthem.currentTime = 5; } catch (e) {} usAnthem.play().catch(() => {}); }   // skip the 5s intro
   }
+  else if (difficulty === "hard") { internAudio.muted = muted; try { internAudio.currentTime = 0; } catch (e) {} internAudio.play().catch(() => {}); }   // hard-mode Red Square: the Internationale
   else { anthem.muted = muted; try { anthem.currentTime = 0; } catch (e) {} anthem.play().catch(() => {}); }
   [659, 784, 988, 1319].forEach((f, i) => setTimeout(() => beep(f, 0.22, 0.24, "triangle"), i * 150));
 }
@@ -4536,6 +4539,83 @@ function drawEast(sX, gy) {
   for (const t of launchSurface.eastTrees) { const x = sX(t.x); if (x < -30 || x > W + 30) continue; const sway = Math.sin(performance.now() / 600 + t.sway) * 1.4; ctx.fillStyle = "#5a3a20"; ctx.fillRect(x - 1.5, gy - t.h * 0.34, 3, t.h * 0.34); if (t.pine) { ctx.fillStyle = "#2f6a30"; for (let k = 0; k < 3; k++) { const ty = gy - t.h * 0.32 - k * t.h * 0.25, ww = (t.h * 0.44) * (1 - k * 0.22); ctx.beginPath(); ctx.moveTo(x - ww / 2, ty); ctx.lineTo(x + sway, ty - t.h * 0.34); ctx.lineTo(x + ww / 2, ty); ctx.closePath(); ctx.fill(); } } else { ctx.fillStyle = "#357a35"; ctx.beginPath(); ctx.arc(x + sway, gy - t.h * 0.62, t.h * 0.4, 0, Math.PI * 2); ctx.fill(); } }
 }
 // the western landscape: ponds, paved Moscow + landmarks + banners, the town, hamlet, forest
+// a stylised Lenin portrait (gold line-art) for the giant banner
+function drawLeninFace(cx, cy, r) {
+  ctx.save();
+  ctx.strokeStyle = "#ffe7a0"; ctx.fillStyle = "#ffe7a0"; ctx.lineWidth = 1.6; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.72, r * 0.92, 0, 0, Math.PI * 2); ctx.stroke();          // bald head
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.42, cy - r * 0.18); ctx.lineTo(cx - r * 0.12, cy - r * 0.3); ctx.moveTo(cx + r * 0.12, cy - r * 0.3); ctx.lineTo(cx + r * 0.42, cy - r * 0.18); ctx.stroke();   // brows
+  ctx.beginPath(); ctx.arc(cx - r * 0.24, cy - r * 0.06, 1.3, 0, Math.PI * 2); ctx.arc(cx + r * 0.24, cy - r * 0.06, 1.3, 0, Math.PI * 2); ctx.fill();   // eyes
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.32, cy + r * 0.22); ctx.quadraticCurveTo(cx, cy + r * 0.1, cx + r * 0.32, cy + r * 0.22); ctx.stroke();   // moustache
+  ctx.beginPath(); ctx.moveTo(cx - r * 0.26, cy + r * 0.28); ctx.quadraticCurveTo(cx, cy + r * 0.8, cx + r * 0.26, cy + r * 0.28); ctx.stroke();   // pointed goatee
+  ctx.restore();
+}
+// a Politburo leader on the wall tribune: dark overcoat + hat, waving down at the crowd
+function drawLeader(x, balY, i, t) {
+  const wav = 0.5 + 0.45 * Math.sin(t * 3 + i * 1.3);
+  const feet = balY, sh = balY - 13, head = balY - 16;
+  ctx.save();
+  ctx.fillStyle = "#23272e"; ctx.strokeStyle = "#23272e"; ctx.lineWidth = 1.4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(x - 3, sh); ctx.lineTo(x + 3, sh); ctx.lineTo(x + 4, feet); ctx.lineTo(x - 4, feet); ctx.closePath(); ctx.fill();   // overcoat
+  ctx.fillStyle = "#cbb78c"; ctx.beginPath(); ctx.arc(x, head, 2.2, 0, Math.PI * 2); ctx.fill();   // face
+  ctx.fillStyle = "#2a2e36"; ctx.fillRect(x - 3, head - 4, 6, 3); ctx.fillRect(x - 4.5, head - 1.5, 9, 1.6);   // hat + brim
+  ctx.strokeStyle = "#23272e"; ctx.beginPath(); ctx.moveTo(x + 2, sh + 1); ctx.lineTo(x + 6, sh + 1 - 5 * wav); ctx.stroke();   // waving arm
+  ctx.restore();
+}
+// the Red Square victory fanfare: giant Lenin banner, a leaders' tribune on the wall, and a huge crowd
+function drawMoscowFanfare(sX, gy) {
+  const M = launchSurface.moscow, now = performance.now();
+  const t = rocket.landTime ? (now - rocket.landTime) / 1000 : 0;
+  if (!M.fanfareCrowd) {   // lazy-build a big fixed crowd + a few slogan banners across the square
+    M.fanfareCrowd = [];
+    for (let i = 0; i < 80; i++) M.fanfareCrowd.push({ x: rand(M.basilsX + 120, M.kremlinX - 90), ph: rand(0, 6.3), flag: Math.random() < 0.45 });
+    const slogans = ["ПРОЛЕТАРИИ ВСЕХ СТРАН, СОЕДИНЯЙТЕСЬ!", "СЛАВА КПСС", "ЛЕНИН ЖИЛ, ЛЕНИН ЖИВ, ЛЕНИН БУДЕТ ЖИТЬ", "СССР"];
+    M.fanfareBanners = [];
+    for (let i = 0; i < 4; i++) M.fanfareBanners.push({ x: M.basilsX + 250 + i * 240, slog: slogans[i % slogans.length] });
+  }
+  // --- giant Lenin banner unrolling down the Kremlin wall ---
+  { const Lx = sX(M.redSquareX), bw = 78, topY = gy - 165, fullH = 135, h = fullH * clamp(t / 1.6, 0.05, 1);
+    if (Lx > -120 && Lx < W + 120) {
+      ctx.strokeStyle = "#caa94a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(Lx - bw / 2 - 5, topY); ctx.lineTo(Lx + bw / 2 + 5, topY); ctx.stroke();   // hang rail
+      ctx.fillStyle = "#b41818"; ctx.fillRect(Lx - bw / 2, topY, bw, h);                                  // red banner, grows down
+      ctx.fillStyle = "#caa94a"; ctx.fillRect(Lx - bw / 2, topY, 2, h); ctx.fillRect(Lx + bw / 2 - 2, topY, 2, h);   // gold edges
+      ctx.fillRect(Lx - bw / 2 - 3, topY + h - 3, bw + 6, 4);                                              // weighted roller at the bottom
+      if (h > 60) { drawLeninFace(Lx, topY + 52, 30);
+        glowOn(4, "#ffe7a0"); ctx.fillStyle = "#ffe7a0"; ctx.font = "bold 12px 'Courier New', monospace"; ctx.textAlign = "center"; ctx.fillText("ЛЕНИН", Lx, topY + 116); glowOff(); ctx.textAlign = "left"; }
+    } }
+  // --- leaders' tribune set into the wall, left of the banner; they emerge and look down ---
+  { const Tx = sX(M.redSquareX - 150), tw = 92, balY = gy - 52;
+    if (Tx > -120 && Tx < W + 120) {
+      ctx.fillStyle = "#34120c"; ctx.fillRect(Tx - 15, balY - 24, 30, 24);                                // doorway in the wall
+      ctx.strokeStyle = "#caa94a"; ctx.lineWidth = 1.4; ctx.strokeRect(Tx - 15, balY - 24, 30, 24);
+      ctx.fillStyle = "#7a6a52"; ctx.fillRect(Tx - tw / 2, balY, tw, 7);                                  // balcony slab
+      ctx.fillStyle = "#b41818"; ctx.fillRect(Tx - tw / 2, balY + 7, tw, 9);                              // red bunting
+      ctx.fillStyle = "#caa94a"; for (let gx = Tx - tw / 2 + 6; gx < Tx + tw / 2; gx += 15) { ctx.beginPath(); ctx.moveTo(gx, balY + 16); ctx.lineTo(gx + 4, balY + 16); ctx.lineTo(gx + 2, balY + 21); ctx.closePath(); ctx.fill(); }
+      const n = 5, emerge = clamp((t - 0.7) / 2.2, 0, 1);
+      for (let i = 0; i < n && emerge > 0; i++) { const target = Tx - tw / 2 + 12 + i * ((tw - 24) / (n - 1)); drawLeader(Tx + (target - Tx) * emerge, balY, i, t); }
+    } }
+  // --- the crowd: tons of cheering people, many with red flags, scaled to the figures ---
+  for (const c of M.fanfareCrowd) {
+    const x = sX(c.x); if (x < -14 || x > W + 14) continue;
+    drawPerson(x, gy, c.ph, true);
+    if (c.flag) { const wav = Math.sin(now / 180 + c.ph) * 2, hx = x + 3, hy = gy - 6;
+      ctx.strokeStyle = "#6a5230"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy - 15); ctx.stroke();
+      ctx.fillStyle = "#d81b1b"; ctx.beginPath(); ctx.moveTo(hx, hy - 15); ctx.lineTo(hx + 9 + wav, hy - 13); ctx.lineTo(hx + 8 + wav, hy - 10); ctx.lineTo(hx, hy - 9); ctx.closePath(); ctx.fill(); }
+  }
+  // --- a few big slogan banners held aloft over the crowd ---
+  for (const b of M.fanfareBanners) {
+    const x = sX(b.x); if (x < -180 || x > W + 180) continue;
+    const sway = Math.sin(now / 700 + b.x) * 1.5, bw = 150, by = gy - 30 + sway, bh = 17;
+    ctx.strokeStyle = "#6a5230"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x - bw / 2, by + bh); ctx.lineTo(x - bw / 2, gy - 6); ctx.moveTo(x + bw / 2, by + bh); ctx.lineTo(x + bw / 2, gy - 6); ctx.stroke();
+    ctx.fillStyle = "#c01818"; ctx.fillRect(x - bw / 2, by, bw, bh);
+    ctx.fillStyle = "#8a1010"; ctx.fillRect(x - bw / 2, by, bw, 2); ctx.fillRect(x - bw / 2, by + bh - 2, bw, 2);
+    glowOn(4, "#ffd24a"); ctx.fillStyle = "#ffe07a"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    let fs = 10; ctx.font = "bold " + fs + "px 'Courier New', monospace"; const txt = tr(b.slog);
+    while (ctx.measureText(txt).width > bw - 8 && fs > 5) { fs -= 0.5; ctx.font = "bold " + fs + "px 'Courier New', monospace"; }
+    ctx.fillText(txt, x, by + bh / 2); glowOff(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  }
+}
 function drawWest(sX, gy) {
   const M = launchSurface.moscow;
   drawMountains(sX, gy);   // the Caucasus + Elbrus, far behind everything
@@ -4605,6 +4685,7 @@ function drawWest(sX, gy) {
     const x = sX(wx); if (x < -10 || x > W + 10) continue;
     drawPerson(x, gy, w.ph, !flee && landedM && w.plaza);
   }   // SF (plaza2) crowd is drawn in drawEast, on top of the city
+  if (landedM) drawMoscowFanfare(sX, gy);   // victory: giant Lenin banner, leaders' tribune, huge flag-waving crowd
   // red-flashing lattice antenna masts before Moscow
   { const blink = Math.floor(performance.now() / 500) % 2 === 0;
     for (const t of launchSurface.westTowers) {
