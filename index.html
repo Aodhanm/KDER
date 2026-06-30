@@ -2568,8 +2568,9 @@ function drawRocket(flame, sep, noNose) {
     ctx.lineTo(sgn * 14.5, 14);         // flare down the outer edge (a touch tighter)
     ctx.lineTo(sgn * 15.5, 18);         // engine skirt
     ctx.closePath(); ctx.stroke();
-    // a body band
+    // a couple of body bands
     ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sgn * 6, 2); ctx.lineTo(sgn * 14, 2); ctx.stroke();
+    ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(sgn * 5.5, -10); ctx.lineTo(sgn * 12.5, -10); ctx.stroke();
     if (flame) drawEngineFlame(sgn * 10.5, 18, 4.2, 26);
     glowOff();
     ctx.restore();
@@ -2589,6 +2590,10 @@ function drawRocket(flame, sep, noNose) {
   // separation/stage rings on the core
   ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-6, -42); ctx.lineTo(6, -42); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-6, 2); ctx.lineTo(6, 2); ctx.stroke();
+  // a little extra body detail to match the N1
+  ctx.lineWidth = 0.7;
+  for (const yy of [-26, -12, 10]) { ctx.beginPath(); ctx.moveTo(-6, yy); ctx.lineTo(6, yy); ctx.stroke(); }   // body bands
+  ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(0, 16); ctx.stroke();                    // vertical seam
   glowOff();
   // red star high on the core + small red СССР stacked below it, within the core walls
   drawStar(0, -34, 4, 1.7, "#e22");
@@ -2633,10 +2638,10 @@ function drawN1(opts) {
     glowOn(s.white ? 3 : 6, s.white ? "#cfe6ff" : "#cdd6e2"); ctx.lineWidth = s.white ? 1.6 : 2.1;
     ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(-s.wt, s.yt); ctx.moveTo(s.wb, s.yb); ctx.lineTo(s.wt, s.yt); ctx.stroke();   // slanted sides
     ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-s.wb, s.yb); ctx.lineTo(s.wb, s.yb); ctx.stroke();                              // bottom ring (stage joint)
-    ctx.lineWidth = 0.8;   // horizontal detail bands
-    for (const f of [0.18, 0.4, 0.6, 0.82]) { const y = s.yb + (s.yt - s.yb) * f, w = s.wb + (s.wt - s.wb) * f; ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(w, y); ctx.stroke(); }
-    ctx.lineWidth = 0.6;   // vertical seam lines
-    for (const fx of [-0.55, -0.28, 0.28, 0.55]) { ctx.beginPath(); ctx.moveTo(s.wb * fx, s.yb); ctx.lineTo(s.wt * fx, s.yt); ctx.stroke(); }
+    ctx.lineWidth = 0.8;   // a couple of horizontal detail bands
+    for (const f of [0.35, 0.7]) { const y = s.yb + (s.yt - s.yb) * f, w = s.wb + (s.wt - s.wb) * f; ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(w, y); ctx.stroke(); }
+    ctx.lineWidth = 0.6;   // one pair of vertical seam lines
+    for (const fx of [-0.5, 0.5]) { ctx.beginPath(); ctx.moveTo(s.wb * fx, s.yb); ctx.lineTo(s.wt * fx, s.yt); ctx.stroke(); }
     glowOff();
   };
   if (opts.only != null) { seg(N1_STAGES[opts.only]); ctx.restore(); return; }
@@ -2645,7 +2650,7 @@ function drawN1(opts) {
     ctx.beginPath(); ctx.moveTo(-wb, yb); ctx.lineTo(-wt, yt); ctx.moveTo(wb, yb); ctx.lineTo(wt, yt); ctx.stroke();   // outer legs
     ctx.beginPath(); ctx.moveTo(-wb, yb); ctx.lineTo(wb, yb); ctx.moveTo(-wt, yt); ctx.lineTo(wt, yt); ctx.stroke();   // rings
     ctx.lineWidth = 1.0;
-    const NB = 4;
+    const NB = 3;
     for (let i = 0; i < NB; i++) {
       const y0 = yb + (yt - yb) * (i / NB), y1 = yb + (yt - yb) * ((i + 1) / NB);
       const w0 = wb + (wt - wb) * (i / NB), w1 = wb + (wt - wb) * ((i + 1) / NB);
@@ -3529,7 +3534,7 @@ function drawLaunch() {
       ctx.scale(1.2, 1.2); ctx.translate(0, -30);
       drawN1({ gone: 0, nose: true, flame });
     } else {
-      ctx.scale(1.35, 1.35); ctx.translate(0, -18);
+      ctx.scale(1.5, 1.5); ctx.translate(0, -18);
       drawRocket(flame, 0);
     }
     ctx.restore();
@@ -5223,12 +5228,13 @@ function drawTitle() {
     if (now >= landerDeadUntil) {
       ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.tang - Math.PI / 2); ctx.scale(0.6, 0.6);   // faces the other way
       drawShipAt(0, 0);
-      // continuous propulsion flame out the engine (local +y is the tail)
+      // continuous propulsion flame out the engine (local +y is the tail); the LK's nozzle is lower + the body bigger
       const fl = 11 + 3 * Math.sin(now / 90);
+      const ny = n1() ? 13 : 12, fw = n1() ? 2.6 : 3, iw = n1() ? 1.5 : 1.6;
       glowOn(10, "#ffae3a");
-      ctx.beginPath(); ctx.moveTo(-3, 12); ctx.lineTo(0, 12 + fl); ctx.lineTo(3, 12); ctx.closePath();
+      ctx.beginPath(); ctx.moveTo(-fw, ny); ctx.lineTo(0, ny + fl); ctx.lineTo(fw, ny); ctx.closePath();
       ctx.fillStyle = "#ffd24a"; ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-1.6, 12); ctx.lineTo(0, 12 + fl * 0.6); ctx.lineTo(1.6, 12); ctx.closePath();
+      ctx.beginPath(); ctx.moveTo(-iw, ny); ctx.lineTo(0, ny + fl * 0.6); ctx.lineTo(iw, ny); ctx.closePath();
       ctx.fillStyle = "#fff2b0"; ctx.fill();
       glowOff();
       ctx.restore();
@@ -5245,9 +5251,9 @@ function drawTitle() {
     ctx.scale(0.66, 0.66);
     drawN1({ gone: 0, nose: true, flame: true });
   } else {
-    ctx.translate(W * 0.72, H * 0.135);
-    ctx.rotate(0.5);
-    ctx.scale(1.2, 1.2);
+    ctx.translate(W * 0.135, H * 0.40);   // same spot as the N1
+    ctx.rotate(0.4);
+    ctx.scale(1.25, 1.25);
     drawRocket(true, 0);
   }
   ctx.restore();
