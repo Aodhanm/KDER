@@ -229,7 +229,7 @@ let musicMode = 1;   // 1 = original recordings (default), 2 = synthesized — a
 // original title music: the 11:46 -> 11:56 segment of title.mp3, played twice then a ~20s gap, looping
 const TM_START = 706, TM_END = 717;
 let tmCount = 0, tmTimeout = null;
-const titleAudio = new Audio("title.mp3"); titleAudio.volume = 0.55;
+const titleAudio = new Audio("title.mp3"); titleAudio.volume = 0.55; titleAudio.preload = "auto";
 titleAudio.addEventListener("timeupdate", () => {
   if (musicMode !== 1) return;
   if (titleAudio.currentTime >= TM_END) {
@@ -270,10 +270,22 @@ function startTitleMusic() {
   if (musicMode === 1) {                          // original: the 11:46->11:56 Internationale segment of title.mp3
     if (tmTimeout) return;                         // currently in the ~20s gap — let it resume on its own
     tmCount = 0;
-    titleAudio.muted = muted;
-    try { titleAudio.currentTime = TM_START; } catch (e) {}
-    titleAudio.play().catch(() => {});
     titlePlaying = true;
+    // Seek into title.mp3 to the segment. iOS Safari IGNORES a seek issued before the
+    // file's metadata has loaded, and plays the track from 0:00 instead ("wrong music").
+    // Fix: keep the play() call synchronous inside the user gesture (iOS requires that),
+    // then (re)apply the seek on the first event where the browser will honour it. Muted
+    // across the jump so the 0:00 blip isn't heard; un-muted on 'seeked' or a short
+    // fallback timeout so it can never get stuck silent.
+    titleAudio.muted = true;
+    let revealed = false;
+    const reveal = () => { if (revealed) return; revealed = true; titleAudio.muted = muted; };
+    const seek = () => { try { if (titleAudio.currentTime < TM_START - 2) titleAudio.currentTime = TM_START; } catch (e) {} };
+    seek();
+    titleAudio.play().catch(() => {});
+    ["loadedmetadata", "canplay", "playing"].forEach(ev => titleAudio.addEventListener(ev, seek, { once: true }));
+    titleAudio.addEventListener("seeked", reveal, { once: true });
+    setTimeout(reveal, 1500);
     return;
   }
   // track 2 = the synthesized Internationale
