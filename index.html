@@ -2645,7 +2645,7 @@ function drawN1(opts) {
   const N = N1_STAGES.length;
   ctx.save();
   ctx.lineJoin = "round"; ctx.lineCap = "round";
-  const WHITE = "#e9eef3", GRAY = "#c2cad4", RED = "#d23b2c";
+  const WHITE = "#e9eef3", GRAY = "#969ca4", RED = "#d23b2c";
   const seg = (s) => {   // transparent: coloured outline + several detail bands + vertical seams
     ctx.strokeStyle = s.white ? WHITE : GRAY;
     glowOn(s.white ? 3 : 6, s.white ? "#cfe6ff" : "#cdd6e2"); ctx.lineWidth = s.white ? 1.6 : 2.1;
