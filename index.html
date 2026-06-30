@@ -42,6 +42,10 @@ let audioReady = false;
 const bgm = new Audio("music_clean.m4a");
 bgm.loop = true; bgm.volume = 0.2;   // main gameplay music, kept quieter than title/anthem
 let bgmStarted = false;
+// SYNTH-mode gameplay music: Wendy Carlos' Moog "March" from A Clockwork Orange (Beethoven 9th,
+// 4th-movement alla marcia), trimmed from the record-shop cue. A real recording — copyrighted.
+const moogMarch = new Audio("clockwork_march.m4a");
+moogMarch.loop = true; moogMarch.volume = 0.4;
 let muted = false;   // M toggles all audio (music + game sounds)
 
 // --- Language: the green button toggles every Russian label to English and back ---
@@ -419,26 +423,18 @@ function scheduleMoogTune(melody, bus, beat) {
   lfo.start(start); lfo.stop(last);
   return t - start;
 }
+// SYNTH-mode gameplay music now plays the real Moog "March" recording (the synthesized Ode
+// couldn't faithfully reproduce the Clockwork Orange cue, so we use the actual track).
 function startMoonSynth() {
   if (moonPlaying) return;
-  if (!audioReady) initAudio();
-  if (!audioReady) return;
-  if (audio.state === "suspended") audio.resume();
-  if (moonGain) { try { moonGain.disconnect(); } catch (e) {} }
-  moonGain = audio.createGain(); moonGain.connect(masterGain);
-  moonGain.gain.value = muted ? 0 : MOON_VOL;
   moonPlaying = true;
-  const loop = () => {
-    if (!moonPlaying) return;
-    const len = scheduleMoogTune(ODE_MELODY, moonGain, MOON_BEAT);
-    moonTimer = setTimeout(loop, len * 1000);
-  };
-  loop();
+  moogMarch.muted = muted;
+  try { moogMarch.currentTime = 0; } catch (e) {}
+  moogMarch.play().catch(() => {});
 }
 function stopMoonSynth() {
   moonPlaying = false;
-  if (moonTimer) { clearTimeout(moonTimer); moonTimer = null; }
-  if (moonGain && audio) moonGain.gain.setTargetAtTime(0, audio.currentTime, 0.05);
+  try { moogMarch.pause(); } catch (e) {}
 }
 // stop gameplay music whichever source is active
 function stopBgm() { bgm.pause(); stopMoonSynth(); }
@@ -1096,7 +1092,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "m") {
     muted = !muted;
     bgm.muted = muted; anthem.muted = muted; titleMusic.muted = muted; alarm.muted = muted; usAnthem.muted = muted;
-    if (moonGain) moonGain.gain.value = muted ? 0 : MOON_VOL;
+    moogMarch.muted = muted;
     if (ssbGain) ssbGain.gain.value = muted ? 0 : SSB_VOL;
     return;
   }
