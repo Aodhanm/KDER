@@ -1005,9 +1005,15 @@ function startReturn() {
   if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
   anthemActive = true;
   stopBgm(); stopSsbSynth(); radio.pause(); gagarin.pause(); sputnikIntro.pause(); alarm.pause();
-  if (masterGain) masterGain.gain.value = 0;
-  try { anthem.currentTime = ANTHEM_START; } catch (e) {}
-  anthem.play().catch(() => {});
+  if (difficulty === "hard") {
+    // hard mode: no anthem in the return cutscene — the Internationale is the only anthem, saved for the Red Square landing
+    anthem.pause(); usAnthem.pause();
+    if (masterGain) masterGain.gain.value = 0.6;
+  } else {
+    if (masterGain) masterGain.gain.value = 0;
+    try { anthem.currentTime = ANTHEM_START; } catch (e) {}
+    anthem.play().catch(() => {});
+  }
 }
 
 function startCelebration() {
@@ -3795,7 +3801,7 @@ function drawRedSquareCelebration(sX, gy) {
   const hasCannon = r.landedCity !== "sf";
   const cmx = cannonMuzzle.x, cmy = cannonMuzzle.y, cang = cannonMuzzle.ang;
   if (hasCannon && now > rsCannonNext) {
-    rsCannonNext = now + 2500; r.cannonT = now; cannonSound();
+    rsCannonNext = now + 4200; r.cannonT = now; cannonSound();
     for (let i = 0; i < 14; i++) { const a = cang + rand(-0.55, 0.55), sp = rand(22, 75); rsCannonSmoke.push({ x: cmx, y: cmy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.5, 1.4), r: rand(1.6, 4) }); }
   }
   for (const sm of rsCannonSmoke) { sm.x += sm.vx * fdt; sm.y += sm.vy * fdt; sm.vy -= 6 * fdt; sm.vx *= 0.96; sm.life -= fdt; sm.r += 6 * fdt; }
