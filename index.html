@@ -1019,15 +1019,11 @@ function startReturn() {
   if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
   anthemActive = true;
   stopBgm(); stopSsbSynth(); radio.pause(); gagarin.pause(); sputnikIntro.pause(); alarm.pause();
-  if (difficulty === "hard") {
-    // hard mode: no anthem in the return cutscene — the Internationale is the only anthem, saved for the Red Square landing
-    anthem.pause(); usAnthem.pause();
-    if (masterGain) masterGain.gain.value = 0.6;
-  } else {
-    if (masterGain) masterGain.gain.value = 0;
-    try { anthem.currentTime = ANTHEM_START; } catch (e) {}
-    anthem.play().catch(() => {});
-  }
+  // the USSR anthem plays in the return-to-Earth cutscene on every difficulty; hard mode only swaps in
+  // the Internationale later, at the Red Square (Moscow) landing
+  if (masterGain) masterGain.gain.value = 0;
+  try { anthem.currentTime = ANTHEM_START; } catch (e) {}
+  anthem.play().catch(() => {});
 }
 
 function startCelebration() {
