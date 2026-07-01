@@ -793,6 +793,7 @@ function submitHighScore(name, sc, diff) {
   l.sort((a, b) => b.score - a.score); highScores[diff] = l.slice(0, 5); saveHighScores();
 }
 loadHighScores();
+let attractStart = performance.now();   // arcade attract mode: title cycles to the info/scores screen after idle
 let intro = false;    // cinematic fly-to-the-Moon between title and gameplay
 let introStart = 0;
 let introStaged = false;   // one-shot: booster-separation sound during the staging beat
@@ -1130,6 +1131,7 @@ function drawWW3(ex, ey, r) {
 // --- Input ---
 window.addEventListener("keydown", (e) => {
   if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
+  attractStart = performance.now();   // any input resets the attract cycle back to the title
   // entering initials on the high-score board captures all typing
   if (hsEntry) {
     if (/^[a-zA-Zа-яА-Я0-9]$/.test(e.key) && hsEntry.initials.length < 3) hsEntry.initials += e.key.toUpperCase();
@@ -1230,7 +1232,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "a") abort();
 });
 window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
-window.addEventListener("pointerdown", () => { if (onTitle) startTitleMusic(); });
+window.addEventListener("pointerdown", () => { attractStart = performance.now(); if (onTitle) startTitleMusic(); });
 
 
 // --- Fullscreen (press F): scale the fixed 900x640 canvas up to fill the screen (letterboxed) ---
@@ -1634,7 +1636,12 @@ function render() {
   if (intro) { drawStars(); drawIntro(); return; }
 
   // title screen shows the small Moon (top-right); gameplay shows the Earth as before
-  if (onTitle) { drawMoonAt(TITLE_MOON.x, TITLE_MOON.y, TITLE_MOON.r); drawStars(); drawTitle(); return; }
+  if (onTitle) {
+    drawMoonAt(TITLE_MOON.x, TITLE_MOON.y, TITLE_MOON.r); drawStars();
+    const ael = (performance.now() - attractStart) / 1000, CYCLE = 36, TITLE_T = 22;   // ~22s title (2 music loops), then ~14s info, looping
+    if (ael % CYCLE >= TITLE_T) drawAttractInfo(); else drawTitle();
+    return;
+  }
 
   // fly the Soyuz off the Moon up to Earth (after docking, before the cutscene)
   if (state === "soyuzclimb") { drawMoonClimb(); return; }
@@ -5471,6 +5478,33 @@ function drawHighScoreTable() {
     ctx.textAlign = "right"; ctx.fillText(e ? String(Math.round(e.score)) : "0", px + pw - 14, y);
   }
   ctx.restore();
+}
+// arcade attract "info" screen: objective + controls on the left, the high-score board on the right
+function drawAttractInfo() {
+  const ru = lang !== "en", now = performance.now();
+  ctx.fillStyle = "rgba(4,8,16,0.84)"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  glowOn(10, "#ff0033"); ctx.fillStyle = "#f4ece0"; ctx.font = "bold 40px 'Courier New', monospace";
+  ctx.fillText("КЕДР", W / 2, H * 0.1); glowOff();
+  ctx.fillStyle = "#ffce5a"; ctx.font = "bold 15px 'Courier New', monospace";
+  ctx.fillText(ru ? "КАК ИГРАТЬ" : "HOW TO PLAY", W / 2, H * 0.1 + 26);
+  const lx = W * 0.08; let y = H * 0.26;
+  ctx.textAlign = "left";
+  glowOn(5, "#ff3a3a"); ctx.fillStyle = "#ffce3a"; ctx.font = "bold 15px 'Courier New', monospace"; ctx.fillText(ru ? "ЦЕЛЬ" : "OBJECTIVE", lx, y); glowOff();
+  ctx.fillStyle = "#bcd0c4"; ctx.font = "13px 'Courier New', monospace"; y += 24;
+  const obj = ru
+    ? ["Взлетите с Земли и посадите модуль", "на Луну. Поднимитесь к «Союзу»,", "состыкуйтесь и вернитесь домой —", "Героем (Москва) или", "Миллионером (Сан-Франциско)."]
+    : ["Launch from Earth and land on the", "Moon. Climb back to the Soyuz, dock,", "and fly home — as a Hero (Moscow)", "or a Millionaire (San Francisco).", "Land soft, slow, and upright."];
+  for (const l of obj) { ctx.fillText(l, lx, y); y += 19; }
+  y += 16;
+  glowOn(5, "#ff3a3a"); ctx.fillStyle = "#ffce3a"; ctx.font = "bold 15px 'Courier New', monospace"; ctx.fillText(ru ? "УПРАВЛЕНИЕ" : "CONTROLS", lx, y); glowOff();
+  ctx.fillStyle = "#8fe6a0"; ctx.font = "13px 'Courier New', monospace"; y += 24;
+  const ctrl = ru
+    ? ["←/→   поворот", "↑/ПРОБЕЛ   тяга", "X   отделить ступень", "A   самоуничтожение", "O   сложность и ракета", "M  звук    T  перевод    F  экран"]
+    : ["←/→   rotate", "↑/SPACE   thrust", "X   separate stage", "A   self-destruct", "O   difficulty & rocket", "M  mute    T  translate    F  fullscreen"];
+  for (const l of ctrl) { ctx.fillText(l, lx, y); y += 19; }
+  drawHighScoreTable();   // the board, lower-right
+  if (Math.floor(now / 450) % 2 === 0) { ctx.textAlign = "center"; glowOn(10, "#5cff6a"); ctx.fillStyle = "#7dff8a"; ctx.font = "bold 20px 'Courier New', monospace"; ctx.fillText(ru ? "НАЖМИТЕ ВВОД" : "PRESS ENTER", W * 0.30, H - 34); glowOff(); }
 }
 function drawTitle() {
   const now = performance.now();
