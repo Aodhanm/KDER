@@ -3210,8 +3210,8 @@ function razeSpaceport() {
 }
 function launchCrash(m) {
   rocket.phase = "crashed"; rocket.msg = m; rocket.boomTime = performance.now();
-  const big = n1() && rocket.stage === "rocket" ? 1.6 : 1;   // the fuelled N1 goes up bigger
-  addShake(10 + big * 4); (but not so big it chokes)
+  const big = n1() && rocket.stage === "rocket" ? 1.6 : 1;   // the fuelled N1 goes up bigger (but not so big it chokes)
+  addShake(10 + big * 4);
   launchFireballs.push({ x: rocket.x, y: rocket.y + 20, t: performance.now(), big });
   destroyBuildings(rocket.x);
   destroyTanks(rocket.x);
