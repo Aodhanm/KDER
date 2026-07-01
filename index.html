@@ -5627,8 +5627,6 @@ function drawTitle() {
   ctx.font = "bold 20px 'Courier New', monospace";
   ctx.fillText("MMXXVI", 22, H - 36);
 
-  drawHighScoreTable();   // top-5 board (lower-right)
-
   // explosion debris (drawn in front, on top of everything)
   for (let i = titleBits.length - 1; i >= 0; i--) {
     const p = titleBits[i];
