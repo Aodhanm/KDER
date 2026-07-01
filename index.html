@@ -776,6 +776,8 @@ const ship = {};
 let throttle = 0, fuel = 0, score = 0, timeLeft = 0;
 let state = "play", msg = "";
 let particles = [], keys = {}, beepTimer = 0;
+let shake = 0;   // screen-shake magnitude (px), decays each frame
+function addShake(a) { shake = Math.min(18, shake + a); }
 let onTitle = true;   // show the КЕДР title screen until the player presses Enter
 let optionsOpen = false;          // options menu (toggled with O)
 let difficulty = "original";      // easy | original | hard — placeholder, no effect yet
@@ -1266,7 +1268,13 @@ let last = performance.now();
 function loop(now) {
   let dt = (now - last) / 1000; last = now;
   if (dt > 0.05) dt = 0.05;
-  update(dt); render(); drawControlsHint(); drawOptions();
+  update(dt);
+  const shaking = shake > 0.3;
+  if (shaking) { const sdx = (Math.random() * 2 - 1) * shake, sdy = (Math.random() * 2 - 1) * shake; shake *= Math.exp(-9 * dt); ctx.save(); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.translate(sdx, sdy); }
+  else shake = 0;
+  render();
+  if (shaking) ctx.restore();
+  drawControlsHint(); drawOptions();
   requestAnimationFrame(loop);
 }
 
@@ -1518,6 +1526,7 @@ function checkLanding(gy) {
 
   if (!awaitingUndock && onPad && vDisp <= SAFE_V && hDisp <= SAFE_H && upright) {
     state = "landed";
+    addShake(3.5);   // a small touchdown thud
     const gained = Math.round(50 * pad.mult + Math.max(0, SAFE_V - vDisp) * 8);
     score += gained;
     showFlag = true; landedPad = pad;          // plant a flag on any landing
@@ -1549,6 +1558,7 @@ function spawnExhaust() {
 }
 // power scales debris count + velocity (a fast, > 100-speed crash throws far more, faster)
 function explode(power) {
+  addShake(6 + power * 3);
   power = power || 1;
   const sparks = Math.round(90 * power), shards = Math.round(22 * power);
   // bright sparks blasting outward
@@ -3184,6 +3194,7 @@ function drawFlungPerson(x, y, rot) {
 // a pad explosion that levels the ENTIRE spaceport: every building, shed, tank, tower, dish + the gantry
 function razeSpaceport() {
   const ls = launchSurface; if (!ls) return;
+  addShake(17);   // the whole spaceport goes up
   for (const b of ls.buildings) b.destroyed = true;
   for (const b of ls.bgBuildings) b.destroyed = true;
   for (const s of ls.sheds) s.destroyed = true;
@@ -3199,7 +3210,8 @@ function razeSpaceport() {
 }
 function launchCrash(m) {
   rocket.phase = "crashed"; rocket.msg = m; rocket.boomTime = performance.now();
-  const big = n1() && rocket.stage === "rocket" ? 1.6 : 1;   // the fuelled N1 goes up bigger (but not so big it chokes)
+  const big = n1() && rocket.stage === "rocket" ? 1.6 : 1;   // the fuelled N1 goes up bigger
+  addShake(10 + big * 4); (but not so big it chokes)
   launchFireballs.push({ x: rocket.x, y: rocket.y + 20, t: performance.now(), big });
   destroyBuildings(rocket.x);
   destroyTanks(rocket.x);
