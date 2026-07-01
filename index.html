@@ -1129,6 +1129,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "t") { lang = lang === "ru" ? "en" : "ru"; return; }
   // options menu (works in any state)
   if (e.key.toLowerCase() === "o") { optionsOpen = !optionsOpen; return; }
+  if (e.key === "`") { previewFanfare(); return; }   // hidden: preview the hard-mode Red Square fanfare
   if (optionsOpen && (e.key === "1" || e.key === "2" || e.key === "3")) {
     difficulty = { "1": "easy", "2": "original", "3": "hard" }[e.key];
     return;
@@ -3011,6 +3012,16 @@ function startHomecoming(side) {
   launchStars = null; launchParts = []; launchFireballs = []; flungPeople = []; launchDiscards = []; launchFlash = 0;
   startBgm();
   try { rocketEngine.pause(); rocketEngine.currentTime = 0; alarm.pause(); } catch (e) {}
+}
+// hidden preview (` key): jump straight to a HARD-mode Red Square victory fanfare to see it without playing through
+function previewFanfare() {
+  resumeAudio();                 // switch the Web-Audio engine on first, or the boosted Internationale is silent
+  difficulty = "hard";
+  startHomecoming("hero");
+  stopBgm();
+  const M = launchSurface.moscow;
+  rocket.x = M.redSquareX; rocket.vx = 0; rocket.vy = 0; rocket.angle = 0;
+  landCity("moscow");
 }
 function spawnRocketExhaust() {
   // a full fire plume from all three engine bells — left strap-on, core, right strap-on
