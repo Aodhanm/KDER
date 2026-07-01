@@ -209,7 +209,12 @@ const countdown = new Audio("countdown.m4a"); countdown.preload = "auto"; countd
 const ww3Audio = new Audio("ww3_boom.m4a"); ww3Audio.preload = "auto"; ww3Audio.volume = 1;   // nuclear blast for WW3 (clip already begins at the 10s mark); everything else goes silent
 ww3Audio.addEventListener("ended", () => { if (masterGain && audio) masterGain.gain.setTargetAtTime(0.6, audio.currentTime, 0.4); });
 // HARD-mode Red Square fanfare: the 21:22->end Internationale clip (replaces the Soviet anthem on a hard win only)
-const internAudio = new Audio("internationale.m4a"); internAudio.preload = "auto"; internAudio.volume = 0.92;
+const internAudio = new Audio("internationale.m4a"); internAudio.preload = "auto"; internAudio.volume = 1;
+let internBoosted = false;
+function boostIntern() {   // route the hard-mode Internationale through a Web-Audio gain so it can play LOUD (past 1.0)
+  if (internBoosted || !audioReady || !audio) return;
+  try { const src = audio.createMediaElementSource(internAudio); const g = audio.createGain(); g.gain.value = 2.2; src.connect(g); g.connect(audio.destination); internBoosted = true; } catch (e) {}
+}
 // cash-register "cha-ching" for the SF payout
 const cashAudio = new Audio("cash_register.mp3"); cashAudio.volume = 0.9; cashAudio.preload = "auto";
 // honor-cannon report (pool)
@@ -3292,7 +3297,7 @@ function landCity(city) {
     if (musicMode === 2) playSsbSynth();   // synthesized Star-Spangled Banner
     else { usAnthem.muted = muted; try { usAnthem.currentTime = 5; } catch (e) {} usAnthem.play().catch(() => {}); }   // skip the 5s intro
   }
-  else if (difficulty === "hard") { internAudio.muted = muted; try { internAudio.currentTime = 0; } catch (e) {} internAudio.play().catch(() => {}); }   // hard-mode Red Square: the Internationale
+  else if (difficulty === "hard") { boostIntern(); internAudio.muted = muted; try { internAudio.currentTime = 0; } catch (e) {} internAudio.play().catch(() => {}); }   // hard-mode Red Square: the Internationale (boosted loud)
   else { anthem.muted = muted; try { anthem.currentTime = 0; } catch (e) {} anthem.play().catch(() => {}); }
   [659, 784, 988, 1319].forEach((f, i) => setTimeout(() => beep(f, 0.22, 0.24, "triangle"), i * 150));
 }
