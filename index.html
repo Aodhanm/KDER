@@ -779,6 +779,20 @@ let particles = [], keys = {}, beepTimer = 0;
 let onTitle = true;   // show the КЕДР title screen until the player presses Enter
 let optionsOpen = false;          // options menu (toggled with O)
 let difficulty = "original";      // easy | original | hard — placeholder, no effect yet
+// ===== local high-score table (top 5 per difficulty, arcade initials) — localStorage, self-contained =====
+let highScores = { easy: [], original: [], hard: [] };
+let hsEntry = null;   // { score, diff, initials } while the player types their initials onto the board
+function loadHighScores() {
+  try { const o = JSON.parse(localStorage.getItem("kedr_highscores")); if (o) for (const k of ["easy", "original", "hard"]) if (Array.isArray(o[k])) highScores[k] = o[k].slice(0, 5); } catch (e) {}
+}
+function saveHighScores() { try { localStorage.setItem("kedr_highscores", JSON.stringify(highScores)); } catch (e) {} }
+function highQualifies(sc, diff) { const l = highScores[diff] || []; return sc > 0 && (l.length < 5 || sc > l[l.length - 1].score); }
+function submitHighScore(name, sc, diff) {
+  const l = highScores[diff] || (highScores[diff] = []);
+  l.push({ name: (name || "AAA").toUpperCase().replace(/[^A-ZА-Я0-9]/g, "").slice(0, 3).padEnd(3, "A"), score: Math.round(sc) });
+  l.sort((a, b) => b.score - a.score); highScores[diff] = l.slice(0, 5); saveHighScores();
+}
+loadHighScores();
 let intro = false;    // cinematic fly-to-the-Moon between title and gameplay
 let introStart = 0;
 let introStaged = false;   // one-shot: booster-separation sound during the staging beat
@@ -1116,6 +1130,13 @@ function drawWW3(ex, ey, r) {
 // --- Input ---
 window.addEventListener("keydown", (e) => {
   if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
+  // entering initials on the high-score board captures all typing
+  if (hsEntry) {
+    if (/^[a-zA-Zа-яА-Я0-9]$/.test(e.key) && hsEntry.initials.length < 3) hsEntry.initials += e.key.toUpperCase();
+    else if (e.key === "Backspace") hsEntry.initials = hsEntry.initials.slice(0, -1);
+    else if (e.key === "Enter") { submitHighScore(hsEntry.initials || "AAA", hsEntry.score, hsEntry.diff); hsEntry = null; onTitle = true; startTitleMusic(); }
+    return;
+  }
   // mute toggle — works in ANY state (title, launch, intro, game, cutscene)
   if (e.key.toLowerCase() === "m") {
     muted = !muted;
@@ -1173,7 +1194,7 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       if (rocket.phase === "raise") { rocket.phase = "fly"; rocket.angle = 0; try { countdown.pause(); } catch (e2) {} }
       else if (rocket.phase === "crashed") { if (homecoming) startHomecoming(homecoming); else startLaunch(); }
-      else if (rocket.phase === "landed" && homecoming) { anthem.pause(); usAnthem.pause(); internAudio.pause(); stopSsbSynth(); stopAllMigEngines(); launching = false; homecoming = null; onTitle = true; startTitleMusic(); }   // homecoming win -> title
+      else if (rocket.phase === "landed" && homecoming) { anthem.pause(); usAnthem.pause(); internAudio.pause(); stopSsbSynth(); stopAllMigEngines(); launching = false; homecoming = null; if (highQualifies(score, difficulty)) { hsEntry = { score: score, diff: difficulty, initials: "" }; } else { onTitle = true; startTitleMusic(); } }   // homecoming win -> high-score entry or title
       else if (rocket.phase === "landed") { anthem.pause(); usAnthem.pause(); internAudio.pause(); stopSsbSynth(); stopAllMigEngines(); startBgm(); startLaunch(); }
       else { launching = false; intro = true; introStart = performance.now(); introStaged = false; introNosed = false; introFlashed = false; introRocketSnd = introRocketDone = introLanderSnd = introLanderDone = false; try { rocketEngine.pause(); rocketEngine.volume = 0; } catch (e) {} if (audioReady && thrustGain) thrustGain.gain.setTargetAtTime(0, audio.currentTime, 0.02); }
     }
@@ -1585,6 +1606,7 @@ function groundScreenY(screenX) {
 }
 
 function render() {
+  if (hsEntry) { drawHighScoreEntry(); return; }
   camX = ship.x - W / 2;
 
   // ease zoom toward the altitude-derived target
@@ -3020,6 +3042,7 @@ function previewFanfare() {
   difficulty = "hard";
   startHomecoming("hero");
   stopBgm();
+  score = 1000 + Math.floor(Math.random() * 90000);   // demo score so the ` preview also exercises the high-score entry
   const M = launchSurface.moscow;
   rocket.x = M.redSquareX; rocket.vx = 0; rocket.vy = 0; rocket.angle = 0;
   landCity("moscow");
@@ -5408,6 +5431,47 @@ function titleBoom(x, y, scale) {
 }
 
 // Soviet space-poster-style title screen
+// full-screen "enter your initials" board after a qualifying homecoming win
+function drawHighScoreEntry() {
+  const ru = lang !== "en";
+  ctx.fillStyle = "#0a0e18"; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  glowOn(16, "#ff3333"); ctx.fillStyle = "#ff3b3b"; ctx.font = "bold 34px 'Courier New', monospace";
+  ctx.fillText(ru ? "НОВЫЙ РЕКОРД!" : "NEW HIGH SCORE!", W / 2, H * 0.24); glowOff();
+  glowOn(6, "#ffae20"); ctx.fillStyle = "#ffce3a"; ctx.font = "bold 22px 'Courier New', monospace";
+  ctx.fillText((ru ? "ОЧКИ " : "SCORE ") + Math.round(hsEntry.score), W / 2, H * 0.35); glowOff();
+  ctx.fillStyle = "#9fe0ff"; ctx.font = "15px 'Courier New', monospace";
+  ctx.fillText(ru ? "ВВЕДИТЕ ИНИЦИАЛЫ" : "ENTER YOUR INITIALS", W / 2, H * 0.45);
+  const init = (hsEntry.initials || "").padEnd(3, "_");
+  ctx.font = "bold 52px 'Courier New', monospace";
+  for (let i = 0; i < 3; i++) {
+    const x = W / 2 + (i - 1) * 58, filled = i < hsEntry.initials.length;
+    glowOn(10, "#5cff6a"); ctx.fillStyle = filled ? "#7dff8a" : "#3a8a44"; ctx.fillText(init[i], x, H * 0.58); glowOff();
+    if (i === hsEntry.initials.length && Math.floor(performance.now() / 400) % 2 === 0) { ctx.fillStyle = "#7dff8a"; ctx.fillRect(x - 17, H * 0.58 + 30, 34, 3); }
+  }
+  ctx.fillStyle = "#788"; ctx.font = "13px 'Courier New', monospace";
+  ctx.fillText(ru ? "A–Я  ·  BACKSPACE  ·  ENTER — ГОТОВО" : "A–Z  ·  BACKSPACE  ·  ENTER — DONE", W / 2, H * 0.73);
+}
+// the top-5 board for the current difficulty, lower-right of the title
+function drawHighScoreTable() {
+  const ru = lang !== "en", diff = difficulty, list = highScores[diff] || [];
+  const pw = 214, ph = 156, px = W - pw - 14, py = H - ph - 22;
+  ctx.save();
+  ctx.fillStyle = "rgba(6,12,22,0.74)"; ctx.fillRect(px, py, pw, ph);
+  ctx.strokeStyle = "#2faa3a"; ctx.lineWidth = 1.5; ctx.strokeRect(px, py, pw, ph);
+  ctx.textBaseline = "middle";
+  const dl = { easy: ru ? "ЛЁГКИЙ" : "EASY", original: ru ? "ОБЫЧНЫЙ" : "ORIGINAL", hard: ru ? "ТЯЖЁЛЫЙ" : "HARD" }[diff];
+  glowOn(5, "#ff3a3a"); ctx.fillStyle = "#ffce3a"; ctx.font = "bold 14px 'Courier New', monospace"; ctx.textAlign = "center";
+  ctx.fillText((ru ? "РЕКОРДЫ · " : "HIGH SCORES · ") + dl, px + pw / 2, py + 18); glowOff();
+  ctx.font = "13px 'Courier New', monospace";
+  for (let i = 0; i < 5; i++) {
+    const e = list[i], y = py + 44 + i * 21;
+    ctx.fillStyle = e ? "#8fe6a0" : "#356048";
+    ctx.textAlign = "left"; ctx.fillText((i + 1) + ".  " + (e ? e.name : "- - -"), px + 14, y);
+    ctx.textAlign = "right"; ctx.fillText(e ? String(Math.round(e.score)) : "0", px + pw - 14, y);
+  }
+  ctx.restore();
+}
 function drawTitle() {
   const now = performance.now();
   const dt = titleLastT ? Math.min(0.05, (now - titleLastT) / 1000) : 0; titleLastT = now;
@@ -5562,6 +5626,8 @@ function drawTitle() {
   ctx.fillStyle = "#d81b1b";
   ctx.font = "bold 20px 'Courier New', monospace";
   ctx.fillText("MMXXVI", 22, H - 36);
+
+  drawHighScoreTable();   // top-5 board (lower-right)
 
   // explosion debris (drawn in front, on top of everything)
   for (let i = titleBits.length - 1; i >= 0; i--) {
