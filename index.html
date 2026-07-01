@@ -213,7 +213,7 @@ const internAudio = new Audio("internationale.m4a"); internAudio.preload = "auto
 // cash-register "cha-ching" for the SF payout
 const cashAudio = new Audio("cash_register.mp3"); cashAudio.volume = 0.9; cashAudio.preload = "auto";
 // honor-cannon report (pool)
-const cannonPool = [0, 1].map(() => { const a = new Audio("cannon_sfx.mp3"); a.volume = 0.85; return a; });
+const cannonPool = [0, 1].map(() => { const a = new Audio("cannon_sfx.m4a"); a.volume = 0.85; return a; });   // single-boom clip (old .mp3 had two shots)
 let cannonIdx = 0;
 function cannonSound() { const a = cannonPool[cannonIdx]; cannonIdx = (cannonIdx + 1) % cannonPool.length; try { a.currentTime = 0; } catch (e) {} a.play().catch(() => {}); }
 let radioPlayed = false;
