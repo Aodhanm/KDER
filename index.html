@@ -793,6 +793,19 @@ function submitHighScore(name, sc, diff) {
   l.sort((a, b) => b.score - a.score); highScores[diff] = l.slice(0, 5); saveHighScores();
 }
 loadHighScores();
+// ===== remember settings across sessions (mute, difficulty, rocket, language, music) — localStorage =====
+function saveSettings() { try { localStorage.setItem("kedr_settings", JSON.stringify({ muted, difficulty, rocketType, lang, musicMode })); } catch (e) {} }
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem("kedr_settings")); if (!s) return;
+    if (typeof s.muted === "boolean") muted = s.muted;
+    if (["easy", "original", "hard"].includes(s.difficulty)) difficulty = s.difficulty;
+    if (["vostok", "n1"].includes(s.rocketType)) rocketType = s.rocketType;
+    if (s.lang === "ru" || s.lang === "en") lang = s.lang;
+    if (s.musicMode === 1 || s.musicMode === 2) musicMode = s.musicMode;
+  } catch (e) {}
+}
+loadSettings();
 let intro = false;    // cinematic fly-to-the-Moon between title and gameplay
 let introStart = 0;
 let introStaged = false;   // one-shot: booster-separation sound during the staging beat
@@ -1139,22 +1152,25 @@ window.addEventListener("keydown", (e) => {
     bgm.muted = muted; anthem.muted = muted; titleMusic.muted = muted; alarm.muted = muted; usAnthem.muted = muted;
     if (moonGain) moonGain.gain.value = muted ? 0 : MOON_VOL;
     if (ssbGain) ssbGain.gain.value = muted ? 0 : SSB_VOL;
+    saveSettings();
     return;
   }
   // fullscreen toggle (works in any state)
   if (e.key.toLowerCase() === "f") { toggleFullscreen(); return; }
   // translate toggle: every Russian label <-> English (works in any state; English text is left alone)
-  if (e.key.toLowerCase() === "t") { lang = lang === "ru" ? "en" : "ru"; return; }
+  if (e.key.toLowerCase() === "t") { lang = lang === "ru" ? "en" : "ru"; saveSettings(); return; }
   // options menu (works in any state)
   if (e.key.toLowerCase() === "o") { optionsOpen = !optionsOpen; return; }
   if (e.key === "`") { previewFanfare(); return; }   // hidden: preview the hard-mode Red Square fanfare
   if (optionsOpen && (e.key === "1" || e.key === "2" || e.key === "3")) {
     difficulty = { "1": "easy", "2": "original", "3": "hard" }[e.key];
+    saveSettings();
     return;
   }
   // options: rocket selection (8 = Vostok/R-7 default, 9 = N1 Moon rocket)
   if (optionsOpen && (e.key === "8" || e.key === "9")) {
     rocketType = e.key === "8" ? "vostok" : "n1";
+    saveSettings();
     return;
   }
   // options: music source — one switch for everything (4 = original recordings, 5 = synth)
@@ -1165,6 +1181,7 @@ window.addEventListener("keydown", (e) => {
       if (onTitle) { stopTitleMusic(); startTitleMusic(); }                 // swap the title theme live
       else if (!anthemActive) { bgm.pause(); stopMoonSynth(); startBgm(); } // swap gameplay music live
     }
+    saveSettings();
     return;
   }
   // Escape returns to the title menu from anywhere
