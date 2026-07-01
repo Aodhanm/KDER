@@ -5648,6 +5648,38 @@ function drawBanner() {
   ctx.restore();
 }
 
+// ===== on-screen touch controls (mobile): appear on first touch; drive the same keys/events as the keyboard =====
+(function setupTouchControls() {
+  if (!("ontouchstart" in window) && !(navigator.maxTouchPoints > 0)) return;
+  const st = document.createElement("style");
+  st.textContent =
+    "#touchpad{position:fixed;inset:0;pointer-events:none;z-index:60;display:none}" +
+    "#touchpad .tb{position:absolute;pointer-events:auto;-webkit-user-select:none;user-select:none;touch-action:none;" +
+    "display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;font-weight:bold;color:#7dff8a;" +
+    "background:rgba(6,20,10,0.45);border:2px solid #2faa3a;border-radius:14px;box-shadow:0 0 10px rgba(47,170,58,0.35)}" +
+    "#touchpad .tb:active{background:rgba(47,170,58,0.6);color:#e8ffec}" +
+    "#touchpad .rnd{border-radius:50%}";
+  document.head.appendChild(st);
+  const pad = document.createElement("div"); pad.id = "touchpad"; document.body.appendChild(pad);
+  function btn(label, rnd, css, onDown, onUp) {
+    const b = document.createElement("div"); b.className = "tb" + (rnd ? " rnd" : ""); b.textContent = label;
+    Object.assign(b.style, css);
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (x) {} onDown(); });
+    const up = (e) => { e.preventDefault(); if (onUp) onUp(); };
+    b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up);
+    pad.appendChild(b);
+  }
+  const hold = (k) => [() => { keys[k] = true; resumeAudio(); }, () => { keys[k] = false; }];
+  const tap = (key) => [() => { resumeAudio(); window.dispatchEvent(new KeyboardEvent("keydown", { key: key })); window.dispatchEvent(new KeyboardEvent("keyup", { key: key })); }, null];
+  btn("◄", true, { left: "16px", bottom: "22px", width: "74px", height: "74px", fontSize: "32px" }, ...hold("arrowleft"));
+  btn("►", true, { left: "104px", bottom: "22px", width: "74px", height: "74px", fontSize: "32px" }, ...hold("arrowright"));
+  btn("▲", true, { right: "16px", bottom: "22px", width: "98px", height: "98px", fontSize: "36px" }, ...hold("arrowup"));
+  btn("X", false, { right: "22px", bottom: "132px", width: "60px", height: "48px", fontSize: "20px" }, ...tap("x"));
+  btn("A", false, { right: "92px", bottom: "132px", width: "60px", height: "48px", fontSize: "20px" }, ...tap("a"));
+  btn("⏎", false, { left: "50%", bottom: "22px", width: "72px", height: "50px", fontSize: "22px", marginLeft: "-36px" }, ...tap("Enter"));
+  window.addEventListener("touchstart", () => { pad.style.display = "block"; }, { once: true });
+})();
+
 newGame();
 requestAnimationFrame(loop);
 })();
